@@ -3,6 +3,7 @@ import re
 import shutil
 import os
 import glob
+import sys
 
 def copy(wildcard, dest):
     for file in glob.glob(wildcard):
@@ -14,6 +15,7 @@ result = subprocess.run(['git', 'tag', '-l', '--contains', 'HEAD'], stdout=subpr
 
 version = result.stdout[1:].decode('utf-8').strip()
 if version == "":
+    print("Failed to get git version", file=sys.stderr)
     exit(1)
 
 print(f"Version {version}")
@@ -39,7 +41,7 @@ with open('AutoRecruit.addon', 'r') as inFile:
     txt = inFile.read()
     # txt = re.sub(r'## Version: \w+', f"## Version: {version}", txt)
     # txt = re.sub(r'## AddOnVersion: \w+', f"## AddOnVersion: {addOnVersion}", txt)
-    with open('_build/AutoRecruit/AutoRecruit.txt', 'w') as outFile:
+    with open('_build/AutoRecruit/AutoRecruit.addon', 'w') as outFile:
         outFile.write(txt)
 
 with open('AutoRecruit.lua', 'r') as inFile:
