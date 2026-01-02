@@ -120,6 +120,13 @@ AR.defaults = {
   	end
   end
 
+	function AutoRecruitKeybind.pasteWelcome()
+		if AR.inviteeID then
+			AR.pasteWelcomeMessage(AR.inviteeGuildID, AR.inviteeID)
+		else
+			d("|c6C00FFAuto Recruit - |cFF8174No recently accepted guild member found. Cannot paste welcome message.")
+		end
+	end
 
   function AR.freeSpots(guildID)
   	local freeSpots = 500-zo_strformat("<<1>>", GetGuildInfo(guildID))-zo_strformat("<<4>>", GetGuildInfo(guildID))
@@ -163,7 +170,7 @@ AR.defaults = {
 
   	if AR.settings.notifications then
   		CHAT_SYSTEM:Maximize()
-    	for i=1, GetNumGuilds() do --FIXME: guildindex
+    	for i=1, GetNumGuilds() do
         if guildID == AR.getIDfromName(AR.settings.recruitFor) or guildID == GetGuildId(i) and AR.settings.guild[i] then
          	if not GetGuildMemberIndexFromDisplayName(guildID, userID) then
          		d("|cFFFFFF" .. userID .. "|c82fa58 has been invited to " .. GetGuildName(guildID) .. ".")
@@ -315,6 +322,7 @@ function AR.Initialize(event, addon)
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_PASTE5", "Paste " .. GetGuildName(GetGuildId(5)) .. "'s Ad")
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_STARTPORT", "Start porting")
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_STOPPORT", "Stop porting")
+	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_PASTEWELCOME", "Paste Welcome Message")
 
 	AR.MakeMenu()
 	AR.getZones()

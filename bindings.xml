@@ -16,6 +16,9 @@
 			<Action name="AUTO_RECRUIT_PASTE5">
 				<Up>AutoRecruitKeybind.pasteText(5)</Up>
 			</Action>
+			<Action name="AUTO_RECRUIT_PASTEWELCOME">
+				<Up>AutoRecruitKeybind.pasteWelcome()</Up>
+			</Action>
 			<Action name="AUTO_RECRUIT_STARTPORT">
 				<Up>AutoRecruitKeybind.start()</Up>
 			</Action>
