@@ -35,15 +35,16 @@ function AR.MakeMenu()
           }
       )
 
-      for guild=1, 5 do
+    local guild = AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
+      --for guild=1, 5 do
 
-     	    table.insert(guildMenu,
-           		{
-          			  type = "header",
-          			  name = guilds[guild],
-                  width = "full",
-              }
-          )
+     	   -- table.insert(guildMenu,
+          -- 		{
+          --			  type = "header",
+          --			  name = guilds[guild],
+          --        width = "full",
+          --    }
+          --)
 
      	    table.insert(guildMenu,
               {
@@ -51,7 +52,7 @@ function AR.MakeMenu()
                   name = "Chat Notifications",
                   getFunc = function() return AR.settings.guild[guild] end,
                   setFunc = function(value) AR.settings.guild[guild] = value end,
-                  width = "half",
+                  width = "full",
                   default = false,
               }
           )
@@ -64,7 +65,8 @@ function AR.MakeMenu()
                   getFunc = function() return AR.settings.ad[guild] end,
                   setFunc = function(value) AR.settings.ad[guild] = value end,
                   isMultiline = true,
-                  width = "half",
+                  isExtraWide = true,
+                  width = "full",
                   default = "",
               }
           )
@@ -72,11 +74,11 @@ function AR.MakeMenu()
      	    table.insert(guildMenu,
               {
                   type = "checkbox",
-                  name = "Welcome Message",
-                  tooltip = "Use @ for the new member's userID",
+                  name = "Enable Welcome Message",
+                  tooltip = "Enable automatically pasting the following welcome message into guild chat when a new member is recruited",
                   getFunc = function() return AR.settings.welcome[guild] end,
                   setFunc = function(value) AR.settings.welcome[guild] = value end,
-                  width = "half",
+                  width = "full",
                   default = false,
               }
           )
@@ -85,11 +87,14 @@ function AR.MakeMenu()
               {
                   type = "editbox",
                   name = "Welcome Message",
-                  tooltip = function() if string.len(AR.settings.welcomeText[guild])>0 then return AR.settings.welcomeText[guild] end end,
+                  tooltip = function()
+                    return "Message automatically pasted into guild chat when a new member is recruited.\nUse @ for the new member's userID\n\n" .. AR.settings.welcomeText[guild]
+                  end,
                   getFunc = function() return AR.settings.welcomeText[guild] end,
                   setFunc = function(value) AR.settings.welcomeText[guild] = value end,
                   isMultiline = true,
-                  width = "half",
+                  isExtraWide = true,
+                  width = "full",
                   default = "",
               }
           )
@@ -126,7 +131,7 @@ function AR.MakeMenu()
 
           table.insert(guildMenu, {type = "custom"})
 
-      end
+      --end
 
     return guildMenu
 
@@ -135,25 +140,6 @@ function AR.MakeMenu()
 
 
   local optionsTable = {
-
-		{
-			  type = "header",
-			  name = "General Settings",
-        width = "full",
-    },
-
-        {
-            type = "dropdown",
-            name = "Recruit for:",
-            tooltip = "Select the guild you want to recruit for",
-            choices = guilds,
-            getFunc = function() return AR.settings.recruitFor end,
-            setFunc = function(value) AR.settings.recruitFor = value end,
-            width = "full",
-            default = guilds[1],
-        },
-
-
 		{
 			  type = "header",
 			  name = "Whisper Auto-Recruiting",
@@ -333,22 +319,51 @@ function AR.MakeMenu()
             setFunc = function(value) AR.settings.portingTime = value end,
             width = "full",
             default = AR.defaults.portingTime,
-        }
+        },
+
+    {
+      type = "header",
+      name = "Guild Settings",
+      width = "full",
+    },
+
+    {
+      type = "dropdown",
+      name = "Recruit for:",
+      tooltip = "Select the guild you want to recruit for",
+      choices = guilds,
+      getFunc = function() return AR.settings.recruitFor end,
+      setFunc = function(value)
+        AutoRecruitGuildSettings.data.disabled = value ~= AutoRecruitGuildSettings.data.guild
+        AutoRecruitGuildSettings:UpdateDisabled()
+        AR.settings.recruitFor = value
+      end,
+      width = "full",
+      default = guilds[1],
+      requiresReload = true,
+    },
   }
-
-
 
   table.insert(optionsTable,
     {
         type = "submenu",
-        name = "Guild Settings",
-        controls = AR.makeGuildMenu()
+        name = AR.settings.recruitFor .. " Settings",
+        controls = AR.makeGuildMenu(),
+        reference = "AutoRecruitGuildSettings",
+        disabled = false,
+        guild = AR.settings.recruitFor
     }
   )
 
   local menu = LibAddonMenu2
-	local panel = menu:RegisterAddonPanel("Auto_Recruit", panelData)
+	local arPanel = menu:RegisterAddonPanel("Auto_Recruit", panelData)
 	menu:RegisterOptionControls("Auto_Recruit", optionsTable)
+
+  CALLBACK_MANAGER:RegisterCallback("LAM-PanelOpened", function(panel)
+    if panel ~= arPanel then return end
+    AutoRecruitGuildSettings.open = true
+    AutoRecruitGuildSettings.animation:PlayFromStart()
+  end)
 
 	SLASH_COMMANDS["/autorecruit"] = function(extra)
 		if extra == "save 1" then
