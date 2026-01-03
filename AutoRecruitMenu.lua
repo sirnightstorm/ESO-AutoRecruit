@@ -342,6 +342,16 @@ function AR.MakeMenu()
       setFunc = function(value) AR.settings.adCooldown[currentGuild()] = value end,
       width = "full",
       default = 30,
+    },
+    {
+      type = "checkbox",
+      name = "Add member note",
+      tooltip = "Enable automatically adding a note when a new member is recruited, e.g.\n" ..
+                AR.getRecruitmentNote(true),
+      getFunc = function() return AR.settings.addNote[currentGuild()] end,
+      setFunc = function(value) AR.settings.addNote[currentGuild()] = value end,
+      width = "full",
+      default = false,
     }
   }
 

@@ -47,6 +47,7 @@ AR.defaults = {
     welcomeText = {"", "", "", "", ""},
     welcomeCooldown = {30, 30, 30, 30, 30},
     adCooldown = {15, 15, 15, 15, 15},
+		addNote = {}
 }
 
 
@@ -165,6 +166,41 @@ AR.defaults = {
 		end
 	end
 
+  function AR.getRecruitmentNote(offline) --TODO : put offline after Recruited
+		local message = zo_strformat("<<1>>: Recruited by <<2>>", os.date("%Y-%m-%d %H:%M", GetTimeStamp()), GetDisplayName())
+		if offline then
+			message = message .. " (offline)"
+		end
+		return message
+	end
+
+	function AR.addGuildMemberNote(guildID, userID)
+		local guildName = GetGuildName(guildID)
+		if not DoesPlayerHaveGuildPermission(guildID, GUILD_PERMISSION_NOTE_EDIT) then
+			d("|c6C00FFAuto Recruit - |cFF8174You do not have permission to edit guild member notes for " .. guildName .. ".")
+			return
+		end
+
+		local guildMemberIndex = GetGuildMemberIndexFromDisplayName(guildID, userID)
+		if not guildMemberIndex then
+			d("|c6C00FFAuto Recruit - |cFF8174User not found in guild " .. guildName .. ".")
+			return
+		end
+
+		local displayName, note, rankIndex, status, secsSinceLogoff = GetGuildMemberInfo(guildID, guildMemberIndex)
+
+		local message = AR.getRecruitmentNote(status == PLAYER_STATUS_OFFLINE or secsSinceLogoff > 0)
+
+		if note == nil or note == "" then
+			note = message
+		else
+			note = note .. "\n" .. AR.settings.addNote[guildID]
+		end
+		SetGuildMemberNote(guildID, guildMemberIndex, note)
+
+		d(zo_strformat("|c82fa58Member note added for <<1>>", guildName))
+	end
+
   function AR.memberAdded(eventCode, guildID, userID)
   	local guild = AR.getGuildIndex(guildID)
 
@@ -191,6 +227,11 @@ AR.defaults = {
 			AR.inviteeGuildID = guildID
 			AR.pasteWelcomeMessage(guildID, userID)
 	  end
+
+		if AR.settings.addNote[guild] and
+		   userID == AR.acceptedID then -- We accepted this user
+			AR.addGuildMemberNote(guildID, userID)
+		end
   end
 
 
@@ -335,6 +376,8 @@ function AR.Initialize(event, addon)
   LibCustomMenu:RegisterPlayerContextMenu(AR.context)
 
 	AR.AttachAcceptApplicationCallback()
+
+	--AR.addGuildMemberNote(AR.getIDfromName(AR.settings.recruitFor), "@SirNightstorm")
 end
 
 em:RegisterForEvent("AutoRecruitInitialize", EVENT_ADD_ON_LOADED, function(...) AR.Initialize(...) end)
