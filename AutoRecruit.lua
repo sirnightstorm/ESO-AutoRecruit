@@ -78,6 +78,15 @@ AR.defaults = {
   	end
   end
 
+	function AR.AttachAcceptApplicationCallback()
+		local existingCallback = ESO_Dialogs["GUILD_ACCEPT_APPLICATION"].buttons[1].callback
+
+		ESO_Dialogs["GUILD_ACCEPT_APPLICATION"].buttons[1].callback = function(dialog)
+			AR.acceptedID = dialog.data.name
+			--d("AR.AttachAcceptApplicationCallback: " .. AR.acceptedID)
+			existingCallback(dialog)
+		end
+	end
 
   function AutoRecruitKeybind.pasteText(guild)
   	CHAT_SYSTEM:Maximize()
@@ -111,6 +120,13 @@ AR.defaults = {
   	end
   end
 
+	function AutoRecruitKeybind.pasteWelcome()
+		if AR.inviteeID then
+			AR.pasteWelcomeMessage(AR.inviteeGuildID, AR.inviteeID)
+		else
+			d("|c6C00FFAuto Recruit - |cFF8174No recently accepted guild member found. Cannot paste welcome message.")
+		end
+	end
 
   function AR.freeSpots(guildID)
   	local freeSpots = 500-zo_strformat("<<1>>", GetGuildInfo(guildID))-zo_strformat("<<4>>", GetGuildInfo(guildID))
@@ -128,14 +144,34 @@ AR.defaults = {
   	end
   end
 
+  function AR.pasteWelcomeMessage(guildID, userID)
+		local guild = AR.getGuildIndex(guildID)
+
+		if GetGuildMemberIndexFromDisplayName(guildID, userID) then
+			local message = string.gsub(AR.settings.welcomeText[guild], "@", userID, 1)
+			local messageAnon = string.gsub(string.gsub(AR.settings.welcomeText[guild], ", @", "", 1), " @", "", 1)
+			local _, _, _, playerStatus = GetGuildMemberInfo(guildID, GetGuildMemberIndexFromDisplayName(guildID, userID))
+
+			if playerStatus~=4 then
+				if AR.cooldown[guild]<GetTimeStamp() and string.len(ZO_ChatWindowTextEntryEditBox:GetText())==0 then
+					CHAT_SYSTEM:Maximize()
+					ZO_ChatWindowTextEntryEditBox:SetText("/g" .. guild .. " " .. message)
+					AR.posted = (ZO_ChatWindowTextEntryEditBox:GetText())
+				elseif ZO_ChatWindowTextEntryEditBox:GetText() == AR.posted then
+					CHAT_SYSTEM:Maximize()
+					ZO_ChatWindowTextEntryEditBox:SetText("/g" .. guild .. " " .. messageAnon)
+				end
+			end
+		end
+	end
 
   function AR.memberAdded(eventCode, guildID, userID)
   	local guild = AR.getGuildIndex(guildID)
 
   	if AR.settings.notifications then
   		CHAT_SYSTEM:Maximize()
-    	for guild=1, GetNumGuilds() do
-        if guildID == AR.getIDfromName(AR.settings.recruitFor) or guildID == GetGuildId(guild) and AR.settings.guild[guild] then
+    	for i=1, GetNumGuilds() do
+        if guildID == AR.getIDfromName(AR.settings.recruitFor) or guildID == GetGuildId(i) and AR.settings.guild[i] then
          	if not GetGuildMemberIndexFromDisplayName(guildID, userID) then
          		d("|cFFFFFF" .. userID .. "|c82fa58 has been invited to " .. GetGuildName(guildID) .. ".")
    			   else
@@ -147,22 +183,13 @@ AR.defaults = {
   		end
 	  end
 
-	  if AR.settings.welcome[guild] and GetGuildMemberIndexFromDisplayName(guildID, userID) then
+	  if AR.settings.welcome[guild] and
+		   userID == AR.acceptedID and -- We accepted this user
+			 GetGuildMemberIndexFromDisplayName(guildID, userID) then
+			--d("Posting welcome: '" .. userID .. "' vs '" .. (AR.acceptedID or "nil") .. "'")
 	   	AR.inviteeID = userID
-    	local message = string.gsub(AR.settings.welcomeText[guild], "@", userID, 1)
-    	local messageAnon = string.gsub(string.gsub(AR.settings.welcomeText[guild], ", @", "", 1), " @", "", 1)
-	   	local _, _, _, playerStatus = GetGuildMemberInfo(guildID, GetGuildMemberIndexFromDisplayName(guildID, userID))
-
-  	  if playerStatus~=4 then
-  	  	if AR.cooldown[guild]<GetTimeStamp() and string.len(ZO_ChatWindowTextEntryEditBox:GetText())==0 then
-  	     	CHAT_SYSTEM:Maximize()
-  	     	ZO_ChatWindowTextEntryEditBox:SetText("/g" .. guild .. " " .. message)
-  	     	AR.posted = (ZO_ChatWindowTextEntryEditBox:GetText())
-  	     elseif ZO_ChatWindowTextEntryEditBox:GetText() == AR.posted then
-  	     	CHAT_SYSTEM:Maximize()
-  	     	ZO_ChatWindowTextEntryEditBox:SetText("/g" .. guild .. " " .. messageAnon)
-  	    end
-  	  end
+			AR.inviteeGuildID = guildID
+			AR.pasteWelcomeMessage(guildID, userID)
 	  end
   end
 
@@ -295,6 +322,7 @@ function AR.Initialize(event, addon)
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_PASTE5", "Paste " .. GetGuildName(GetGuildId(5)) .. "'s Ad")
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_STARTPORT", "Start porting")
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_STOPPORT", "Stop porting")
+	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_PASTEWELCOME", "Paste Welcome Message")
 
 	AR.MakeMenu()
 	AR.getZones()
@@ -306,6 +334,7 @@ function AR.Initialize(event, addon)
 
   LibCustomMenu:RegisterPlayerContextMenu(AR.context)
 
+	AR.AttachAcceptApplicationCallback()
 end
 
 em:RegisterForEvent("AutoRecruitInitialize", EVENT_ADD_ON_LOADED, function(...) AR.Initialize(...) end)
