@@ -342,7 +342,49 @@ function AR.MakeMenu()
       setFunc = function(value) AR.settings.adCooldown[currentGuild()] = value end,
       width = "full",
       default = 30,
-    }
+    },
+    {
+      type = "dropdown",
+      name = "Welcome Mail",
+      --tooltip = "Manual: Open a mail to the last recruit using a keybind\nAutomatic: Opens a mail to the latest recruit immediately after posting the welcome chat message",
+      --choices = { "Disabled", "Manual", "Automatic" },
+      tooltip = "Manual: Open a mail to the last recruit using a keybind",
+      choices = { "Disabled", "Manual" },
+      getFunc = function()
+        return AR.settings.mailMode[currentGuild()]
+      end,
+      setFunc = function(value)
+        AR.settings.mailMode[currentGuild()] = value
+      end,
+      width = "full",
+      default = AR.defaults.mailMode[currentGuild()],
+    },
+    {
+      type = "editbox",
+      name = "Welcome Mail Subject",
+      tooltip = function()
+        return "Subject copied into the Mail form\nUse @ for the new member's @UserID; # for the UserID with '@' removed\n\n" .. AR.settings.mailSubject[currentGuild()]
+      end,
+      getFunc = function() return AR.settings.mailSubject[currentGuild()] end,
+      setFunc = function(value) AR.settings.mailSubject[currentGuild()] = value end,
+      isMultiline = false,
+      isExtraWide = true,
+      width = "full",
+      default = "",
+    },
+    {
+      type = "editbox",
+      name = "Welcome Mail Body",
+      tooltip = function()
+        return "Body text copied into the Mail form\nUse @ for the new member's userID; # for the UserID with '@' removed\n\n" .. AR.settings.mailBody[currentGuild()]
+      end,
+      getFunc = function() return AR.settings.mailBody[currentGuild()] end,
+      setFunc = function(value) AR.settings.mailBody[currentGuild()] = value end,
+      isMultiline = true,
+      isExtraWide = true,
+      width = "full",
+      default = "",
+    },
   }
 
   local menu = LibAddonMenu2
