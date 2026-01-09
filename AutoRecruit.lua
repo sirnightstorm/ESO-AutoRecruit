@@ -137,7 +137,6 @@ AR.defaults = {
 			d("|c6C00FFAuto Recruit - |cFF8174Guild does not have a welcome mail enabled.")
 		elseif #AR.inviteeID < 2 then
 			d("|c6C00FFAuto Recruit - |cFF8174No recently accepted guild member found. Cannot create welcome mail.")
-			AR.createMail(GetGuildId(1), "@SirNightstorm")
 		else
 			AR.createMail(AR.inviteeGuildID, AR.inviteeID)
 		end
@@ -372,6 +371,23 @@ function AR.Initialize(event, addon)
   LibCustomMenu:RegisterPlayerContextMenu(AR.context)
 
 	AR.AttachAcceptApplicationCallback()
+
+	local showMailDialog = {
+		title = { text = "Welcome Mail" },
+		mainText = { text = function() return "Open the Send Mail form to post a welcome message to <<1>> of <<2>>?" end },
+		buttons = {
+			[1] = {
+				text = GetString(SI_OK),
+				callback = function()
+					AR.createMail(AR.inviteeGuildID, AR.inviteeID)
+				end,
+			},
+			[2] = {
+				text = GetString(SI_CANCEL),
+			},
+		}
+	}
+	ZO_Dialogs_RegisterCustomDialog("AUTORECRUIT_SHOW_MAIL", showMailDialog)
 end
 
 em:RegisterForEvent("AutoRecruitInitialize", EVENT_ADD_ON_LOADED, function(...) AR.Initialize(...) end)
@@ -588,6 +604,10 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 
 				if ZO_ChatWindowTextEntryEditBox:GetText() == text then
 					ZO_ChatWindowTextEntryEditBox:Clear()
+				end
+
+				if AR.settings.mailMode[guild] == "Automatic" then
+					ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {AR.inviteeID, GetGuildName(AR.inviteeGuildID)}})
 				end
 			end
 		end
