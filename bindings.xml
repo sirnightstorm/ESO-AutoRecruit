@@ -19,6 +19,9 @@
 			<Action name="AUTO_RECRUIT_PASTEWELCOME">
 				<Up>AutoRecruitKeybind.pasteWelcome()</Up>
 			</Action>
+			<Action name="AUTO_RECRUIT_MAIL">
+				<Up>AutoRecruitKeybind.openMail()</Up>
+			</Action>
 			<Action name="AUTO_RECRUIT_STARTPORT">
 				<Up>AutoRecruitKeybind.start()</Up>
 			</Action>

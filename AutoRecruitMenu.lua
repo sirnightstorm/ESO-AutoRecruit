@@ -310,7 +310,7 @@ function AR.MakeMenu()
       type = "editbox",
       name = "Welcome Message",
       tooltip = function()
-        return "Message automatically pasted into guild chat when a new member is recruited.\nUse @ for the new member's userID\n\n" .. AR.settings.welcomeText[currentGuild()]
+        return "Message automatically pasted into guild chat when a new member is recruited.\n\n" .. AR.settings.welcomeText[currentGuild()]
       end,
       getFunc = function() return AR.settings.welcomeText[currentGuild()] end,
       setFunc = function(value) AR.settings.welcomeText[currentGuild()] = value end,
@@ -342,7 +342,56 @@ function AR.MakeMenu()
       setFunc = function(value) AR.settings.adCooldown[currentGuild()] = value end,
       width = "full",
       default = 30,
-    }
+    },
+    {
+      type = "dropdown",
+      name = "Welcome Mail",
+      --tooltip = "Manual: Open a mail to the last recruit using a keybind\nAutomatic: Opens a mail to the latest recruit immediately after posting the welcome chat message",
+      --choices = { "Disabled", "Manual", "Automatic" },
+      tooltip = "Opens the Send Mail form to the most recent recruit, prefilled with the template information below.\n" ..
+                "Manual: Use a keybind to open the form\n" ..
+                "Automatic: Offers to open the form after a welcome chat message has been sent",
+      choices = { "Disabled", "Manual", "Automatic" },
+      getFunc = function()
+        return AR.settings.mailMode[currentGuild()]
+      end,
+      setFunc = function(value)
+        AR.settings.mailMode[currentGuild()] = value
+      end,
+      width = "full",
+      default = AR.defaults.mailMode[currentGuild()],
+    },
+    {
+      type = "editbox",
+      name = "Welcome Mail Subject",
+      tooltip = function()
+        return "Subject copied into the Mail form\n\n" .. AR.settings.mailSubject[currentGuild()]
+      end,
+      getFunc = function() return AR.settings.mailSubject[currentGuild()] end,
+      setFunc = function(value) AR.settings.mailSubject[currentGuild()] = value end,
+      isMultiline = false,
+      isExtraWide = true,
+      width = "full",
+      default = "",
+    },
+    {
+      type = "editbox",
+      name = "Welcome Mail Body",
+      tooltip = function()
+        return "Body text copied into the Mail form\n\n" .. AR.settings.mailBody[currentGuild()]
+      end,
+      getFunc = function() return AR.settings.mailBody[currentGuild()] end,
+      setFunc = function(value) AR.settings.mailBody[currentGuild()] = value end,
+      isMultiline = true,
+      isExtraWide = true,
+      width = "full",
+      default = "",
+    },
+    {
+      type = "description",
+      text = "|cC5C29EUse the |cFFFFFF@|cC5C29E character to insert the newly recruited member's UserID into welcome text. " ..
+              "Use |cFFFFFF@@|cC5C29E to include an '@' prefix before the UserID.|r"
+    },
   }
 
   local menu = LibAddonMenu2

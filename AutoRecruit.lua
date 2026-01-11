@@ -47,6 +47,9 @@ AR.defaults = {
     welcomeText = {"", "", "", "", ""},
     welcomeCooldown = {30, 30, 30, 30, 30},
     adCooldown = {15, 15, 15, 15, 15},
+		mailMode = {"Disabled", "Disabled", "Disabled", "Disabled", "Disabled"},
+		mailSubject = {"", "", "", "", ""},
+		mailBody = {"", "", "", "", ""},
 }
 
 
@@ -128,6 +131,17 @@ AR.defaults = {
 		end
 	end
 
+  function AutoRecruitKeybind.openMail()
+		local guild = AR.getGuildIndex(AR.inviteeGuildID)
+		if AR.settings.mailMode[guild] == "Disabled" then
+			d("|c6C00FFAuto Recruit - |cFF8174Guild does not have a welcome mail enabled.")
+		elseif #AR.inviteeID < 2 then
+			d("|c6C00FFAuto Recruit - |cFF8174No recently accepted guild member found. Cannot create welcome mail.")
+		else
+			AR.createMail(AR.inviteeGuildID, AR.inviteeID)
+		end
+	end
+
   function AR.freeSpots(guildID)
   	local freeSpots = 500-zo_strformat("<<1>>", GetGuildInfo(guildID))-zo_strformat("<<4>>", GetGuildInfo(guildID))
 
@@ -144,11 +158,19 @@ AR.defaults = {
   	end
   end
 
+function AR.substitutePlaceholders(text, userID)
+	-- Replace '@@' with the full userID, including '@' prefix
+	text = string.gsub(text, "@@", userID)
+	-- Replace '@' with the userID without '@' prefix
+  userID = string.gsub(userID, "@", "")
+	return string.gsub(text, "@", userID)
+end
+
   function AR.pasteWelcomeMessage(guildID, userID)
 		local guild = AR.getGuildIndex(guildID)
 
 		if GetGuildMemberIndexFromDisplayName(guildID, userID) then
-			local message = string.gsub(AR.settings.welcomeText[guild], "@", userID, 1)
+			local message = AR.substitutePlaceholders(AR.settings.welcomeText[guild], userID)
 			local messageAnon = string.gsub(string.gsub(AR.settings.welcomeText[guild], ", @", "", 1), " @", "", 1)
 			local _, _, _, playerStatus = GetGuildMemberInfo(guildID, GetGuildMemberIndexFromDisplayName(guildID, userID))
 
@@ -156,13 +178,27 @@ AR.defaults = {
 				if AR.cooldown[guild]<GetTimeStamp() and string.len(ZO_ChatWindowTextEntryEditBox:GetText())==0 then
 					CHAT_SYSTEM:Maximize()
 					ZO_ChatWindowTextEntryEditBox:SetText("/g" .. guild .. " " .. message)
-					AR.posted = (ZO_ChatWindowTextEntryEditBox:GetText())
-				elseif ZO_ChatWindowTextEntryEditBox:GetText() == AR.posted then
+				elseif ZO_ChatWindowTextEntryEditBox:GetText() == AR.posted then -- multiple players accepted
 					CHAT_SYSTEM:Maximize()
 					ZO_ChatWindowTextEntryEditBox:SetText("/g" .. guild .. " " .. messageAnon)
 				end
+				AR.posted = (ZO_ChatWindowTextEntryEditBox:GetText())
 			end
 		end
+	end
+
+	function AR.createMail(guildID, userID)
+		local guildIndex = AR.getGuildIndex(guildID)
+		local subject = AR.substitutePlaceholders(AR.settings.mailSubject[guildIndex], userID)
+		local body = AR.substitutePlaceholders(AR.settings.mailBody[guildIndex], userID)
+
+		SCENE_MANAGER:Show('mailSend')
+		zo_callLater(function()
+			ZO_MailSendToField:SetText(userID)
+			ZO_MailSendSubjectField:SetText(subject)
+			ZO_MailSendBodyField:SetText(body)
+			ZO_MailSendBodyField:TakeFocus()
+		end, 200)
 	end
 
   function AR.memberAdded(eventCode, guildID, userID)
@@ -323,6 +359,7 @@ function AR.Initialize(event, addon)
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_STARTPORT", "Start porting")
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_STOPPORT", "Stop porting")
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_PASTEWELCOME", "Paste Welcome Message")
+	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_MAIL", "Open Welcome mail form")
 
 	AR.MakeMenu()
 	AR.getZones()
@@ -335,6 +372,23 @@ function AR.Initialize(event, addon)
   LibCustomMenu:RegisterPlayerContextMenu(AR.context)
 
 	AR.AttachAcceptApplicationCallback()
+
+	local showMailDialog = {
+		title = { text = "Welcome Mail" },
+		mainText = { text = function() return "Open the Send Mail form to post a welcome message to <<1>> of <<2>>?" end },
+		buttons = {
+			[1] = {
+				text = GetString(SI_OK),
+				callback = function()
+					AR.createMail(AR.inviteeGuildID, AR.inviteeID)
+				end,
+			},
+			[2] = {
+				text = GetString(SI_CANCEL),
+			},
+		}
+	}
+	ZO_Dialogs_RegisterCustomDialog("AUTORECRUIT_SHOW_MAIL", showMailDialog)
 end
 
 em:RegisterForEvent("AutoRecruitInitialize", EVENT_ADD_ON_LOADED, function(...) AR.Initialize(...) end)
@@ -551,6 +605,10 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 
 				if ZO_ChatWindowTextEntryEditBox:GetText() == text then
 					ZO_ChatWindowTextEntryEditBox:Clear()
+				end
+
+				if AR.settings.mailMode[guild] == "Automatic" then
+					ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {AR.inviteeID, GetGuildName(AR.inviteeGuildID)}})
 				end
 			end
 		end
