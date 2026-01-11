@@ -159,10 +159,11 @@ AR.defaults = {
   end
 
 function AR.substitutePlaceholders(text, userID)
-	local message = string.gsub(text, "@", userID)
-	local strippedUserID = string.gsub(userID, "@", "")
-	message = string.gsub(message, "#", strippedUserID)
-	return message
+	-- Replace '@@' with the full userID, including '@' prefix
+	text = string.gsub(text, "@@", userID)
+	-- Replace '@' with the userID without '@' prefix
+  userID = string.gsub(userID, "@", "")
+	return string.gsub(text, "@", userID)
 end
 
   function AR.pasteWelcomeMessage(guildID, userID)
