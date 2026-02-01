@@ -219,14 +219,21 @@ end
   		end
 	  end
 
-	  if AR.settings.welcome[guild] and
-		   userID == AR.acceptedID and -- We accepted this user
-			 GetGuildMemberIndexFromDisplayName(guildID, userID) then
-			--d("Posting welcome: '" .. userID .. "' vs '" .. (AR.acceptedID or "nil") .. "'")
-	   	AR.inviteeID = userID
+		if userID == AR.acceptedID and -- We accepted this user
+		   GetGuildMemberIndexFromDisplayName(guildID, userID) then
+			AR.inviteeID = userID
 			AR.inviteeGuildID = guildID
-			AR.pasteWelcomeMessage(guildID, userID)
-	  end
+			local _, _, _, playerStatus = GetGuildMemberInfo(guildID, GetGuildMemberIndexFromDisplayName(guildID, userID))
+			if playerStatus~=4 then -- Online
+				if AR.settings.welcome[guild] then
+					AR.pasteWelcomeMessage(guildID, userID)
+				end
+			else -- Offline
+				if AR.settings.mailMode[guild] == "Automatic" then
+					ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {userID, GetGuildName(guildID)}})
+				end
+			end
+		end
   end
 
 
