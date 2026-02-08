@@ -1,0 +1,22 @@
+<GuiXml>
+    <Controls>
+        <TopLevelControl name="AR_SendMailDialog" inherits="ZO_DialogBase" hidden="true" resizeToFitDescendents="true">
+            <OnMouseWheel />
+
+            <Controls>
+                <Label name="$(parent)Text" inherits="ZO_SmallKeyMarkupLabel ZO_DialogContentAnchors" font="ZoFontGameMedium" color="INTERFACE_COLOR_TYPE_TEXT_COLORS:INTERFACE_TEXT_COLOR_NORMAL"/>
+
+                <Control name="$(parent)Cancel" inherits="ZO_DialogButton">
+                    <Anchor point="TOPRIGHT" relativeTo="$(parent)Text" relativePoint="BOTTOMRIGHT" offsetY="23" />
+                </Control>
+                <Control name="$(parent)Edit" inherits="ZO_DialogButton">
+                    <Anchor point="TOPRIGHT" relativeTo="$(parent)Cancel" relativePoint="TOPLEFT" offsetX="-15"/>
+                </Control>
+                <Control name="$(parent)Send" inherits="ZO_DialogButton">
+                    <Anchor point="TOPRIGHT" relativeTo="$(parent)Edit" relativePoint="TOPLEFT" offsetX="-15"/>
+                </Control>
+            </Controls>
+        </TopLevelControl>
+
+    </Controls>
+</GuiXml>
