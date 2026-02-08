@@ -349,9 +349,9 @@ function AR.MakeMenu()
       --tooltip = "Manual: Open a mail to the last recruit using a keybind\nAutomatic: Opens a mail to the latest recruit immediately after posting the welcome chat message",
       --choices = { "Disabled", "Manual", "Automatic" },
       tooltip = "Opens the Send Mail form to the most recent recruit, prefilled with the template information below.\n" ..
-                "Manual: Use a keybind to open the form\n" ..
-                "Automatic: Offers to open the form after a welcome chat message has been sent",
-      choices = { "Disabled", "Manual", "Automatic" },
+                "Ask: Offers to open the form after a welcome chat message has been sent\n" ..
+                "Automatic: Automatically opens the form after a welcome chat message has been sent",
+      choices = { "Disabled", "Ask", "Automatic" },
       getFunc = function()
         return AR.settings.mailMode[currentGuild()]
       end,

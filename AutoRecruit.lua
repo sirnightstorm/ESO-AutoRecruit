@@ -17,6 +17,7 @@ AR.status = 0
 AR.lastRound = 0
 AR.failed = 0
 AR.portingTo = nil
+AR.mailBoxOpen = false
 AR.settings = {}
 AR.defaults = {
     recruitFor = GetGuildName(GetGuildId(1)),
@@ -136,9 +137,15 @@ AR.defaults = {
 		if AR.settings.mailMode[guild] == "Disabled" then
 			d("|c6C00FFAuto Recruit - |cFF8174Guild does not have a welcome mail enabled.")
 		elseif #AR.inviteeID < 2 then
-			d("|c6C00FFAuto Recruit - |cFF8174No recently accepted guild member found. Cannot create welcome mail.")
+			if GetDisplayName() == '@SirNightstorm' then
+				AR.inviteeID = '@NightstormII'
+				AR.inviteeGuildID = GetGuildId(1)
+				ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {'@NightstormII', GetGuildName(AR.inviteeGuildID)}})
+			else
+				d("|c6C00FFAuto Recruit - |cFF8174No recently accepted guild member found. Cannot create welcome mail.")
+			end
 		else
-			AR.createMail(AR.inviteeGuildID, AR.inviteeID)
+			ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {AR.inviteeID, GetGuildName(AR.inviteeGuildID)}})
 		end
 	end
 
@@ -201,7 +208,25 @@ end
 		end, 200)
 	end
 
-  function AR.memberAdded(eventCode, guildID, userID)
+	function AR.sendMail(guildID, userID)
+		if not AR.mailBoxOpen then
+			RequestOpenMailbox()
+			zo_callLater(function() AR.sendMail(guildID, userID) end, 500)
+			return
+		end
+
+		local guildIndex = AR.getGuildIndex(guildID)
+		local subject = AR.substitutePlaceholders(AR.settings.mailSubject[guildIndex], userID)
+		local body = AR.substitutePlaceholders(AR.settings.mailBody[guildIndex], userID)
+
+		AR.sendingMail = true
+		SendMail(userID, subject, body)
+
+		d(zo_strformat("|c6C00FFAuto Recruit - |cFFFFFF Sending mail to <<1>> of <<2>>", userID, GetGuildName(guildID)))
+		--d(zo_strformat("[<<1>>][<<2>>][<<3>>]", userID, subject, body))
+	end
+
+  function AR.memberAdded(_, guildID, userID)
   	local guild = AR.getGuildIndex(guildID)
 
   	if AR.settings.notifications then
@@ -229,8 +254,10 @@ end
 					AR.pasteWelcomeMessage(guildID, userID)
 				end
 			else -- Offline
-				if AR.settings.mailMode[guild] == "Automatic" then
+				if AR.settings.mailMode[guild] == "Ask" then
 					ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {userID, GetGuildName(guildID)}})
+				elseif AR.settings.mailMode[guild] == "Automatic" then
+					AR.sendMail(guildID, userID)
 				end
 			end
 		end
@@ -317,9 +344,9 @@ end
       return collectibleData:IsCategoryType(COLLECTIBLE_CATEGORY_TYPE_HOUSE)
     end
   
-    for i, categoryData in ZO_COLLECTIBLE_DATA_MANAGER:CategoryIterator({IsHousingCat}) do
-      for j, subCategoryData in categoryData:SubcategoryIterator({IsHousingCat}) do
-        for k, subCatCollectibleData in subCategoryData:CollectibleIterator({IsHouseCollectible}) do
+    for _, categoryData in ZO_COLLECTIBLE_DATA_MANAGER:CategoryIterator({IsHousingCat}) do
+      for _, subCategoryData in categoryData:SubcategoryIterator({IsHousingCat}) do
+        for _, subCatCollectibleData in subCategoryData:CollectibleIterator({IsHouseCollectible}) do
           if subCatCollectibleData:IsUnlocked() and not subCatCollectibleData:IsBlocked() then
             local houseID = subCatCollectibleData:GetReferenceId()
             local zoneID = GetHouseFoundInZoneId(houseID)
@@ -344,11 +371,49 @@ end
   	AR.stop()
   end
 
+local function OnMailOpenMailBox()
+	AR.mailBoxOpen = true
+	--d("|c2DC50EMail Box Opened!")
+end
+
+local function OnMailCloseMailBox()
+	AR.mailBoxOpen = false
+	--d("|cC80F14Mail Box Closed!")
+end
+
+local function OnMailSendSuccess()
+	if AR.sendingMail then
+		d(zo_strformat("|c6C00FFAuto Recruit - |cFFFFFF Sent mail to <<1>>", AR.inviteeID))
+		CloseMailbox()
+		AR.sendingMail = false
+	end
+end
+
+local function OnMailSendFailed(_, reason)
+	local error = "Unknown error"
+	if     reason == 8  then error = "COD Error"
+	elseif reason == 11 then error = "Self"
+	elseif reason == 7  then error = "Blank Mail"
+	elseif reason == 1  then error = "DB Error"
+	elseif reason == 4  then error = "Ignored"
+	elseif reason == 10 then error = "In Progress"
+	elseif reason == 2  then error = "Invalid Name"
+	elseif reason == 3  then error = "Full Inbox"
+	elseif reason == 6  then error = "Invalid Item"
+	elseif reason == 12 then error = "Mail Disabled"
+	elseif reason == 13 then error = "Mailbox Closed"
+	elseif reason == 9  then error = "COD Error"
+	elseif reason == 5  then error = "Gold Error"
+	elseif reason == 15 then error = "User Not Found"
+	elseif reason == 0  then error = "Success"
+	elseif reason == 14 then error = "Attachment Error"
+	end
+	d(zo_strformat("|c6C00FFAuto Recruit - |cFFFFFF Failed to send mail to <<1>>: <<3>>", AR.inviteeID, error))
+	AR.sendingMail = false
+end
 
 
-
-function AR.Initialize(event, addon)
-
+function AR.Initialize(_, addon)
 	if addon ~= AR.name then return end
 
 	em:UnregisterForEvent("AutoRecruitInitialize", EVENT_ADD_ON_LOADED)
@@ -376,26 +441,42 @@ function AR.Initialize(event, addon)
   em:RegisterForEvent("AutoRecruitStart", EVENT_ACTION_LAYER_POPPED, AR.chatMessage)
   em:RegisterForEvent("AutoRecruitInfo", EVENT_GUILD_MEMBER_ADDED, AR.memberAdded)
 
-  LibCustomMenu:RegisterPlayerContextMenu(AR.context)
+	em:RegisterForEvent(AR.name, EVENT_MAIL_OPEN_MAILBOX, OnMailOpenMailBox)
+	em:RegisterForEvent(AR.name, EVENT_MAIL_CLOSE_MAILBOX, OnMailCloseMailBox)
+	em:RegisterForEvent(AR.name, EVENT_MAIL_SEND_SUCCESS, OnMailSendSuccess)
+	em:RegisterForEvent(AR.name, EVENT_MAIL_SEND_FAILED, OnMailSendFailed)
+
+	LibCustomMenu:RegisterPlayerContextMenu(AR.context)
 
 	AR.AttachAcceptApplicationCallback()
 
-	local showMailDialog = {
+	local customShowMailDialog = {
+		customControl = AR_SendMailDialog,
 		title = { text = "Welcome Mail" },
-		mainText = { text = function() return "Open the Send Mail form to post a welcome message to <<1>> of <<2>>?" end },
+		mainText = { text = function() return "Send a welcome message to <<1>> of <<2>>?" end },
 		buttons = {
-			[1] = {
-				text = GetString(SI_OK),
+			{
+				control = GetControl(AR_SendMailDialog, "Send"),
+				keybind = "DIALOG_PRIMARY",
+				text = "Send",
+				callback = function()
+					AR.sendMail(AR.inviteeGuildID, AR.inviteeID)
+				end,
+			}, {
+				control = GetControl(AR_SendMailDialog, "Edit"),
+				keybind = "DIALOG_SECONDARY",
+				text = "Edit",
 				callback = function()
 					AR.createMail(AR.inviteeGuildID, AR.inviteeID)
-				end,
-			},
-			[2] = {
-				text = GetString(SI_CANCEL),
-			},
+				end
+			}, {
+				control = GetControl(AR_SendMailDialog, "Cancel"),
+				keybind = "DIALOG_NEGATIVE",
+				text = "Cancel",
+			}
 		}
 	}
-	ZO_Dialogs_RegisterCustomDialog("AUTORECRUIT_SHOW_MAIL", showMailDialog)
+	ZO_Dialogs_RegisterCustomDialog("AUTORECRUIT_SHOW_MAIL", customShowMailDialog)
 end
 
 em:RegisterForEvent("AutoRecruitInitialize", EVENT_ADD_ON_LOADED, function(...) AR.Initialize(...) end)
@@ -614,8 +695,10 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 					ZO_ChatWindowTextEntryEditBox:Clear()
 				end
 
-				if AR.settings.mailMode[guild] == "Automatic" then
+				if AR.settings.mailMode[guild] == "Ask" then
 					ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {AR.inviteeID, GetGuildName(AR.inviteeGuildID)}})
+				elseif AR.settings.mailMode[guild] == "Automatic" then
+					AR.sendMail(AR.inviteeGuildID, AR.inviteeID)
 				end
 			end
 		end
