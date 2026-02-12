@@ -260,6 +260,9 @@ end
 					AR.sendMail(guildID, userID)
 				end
 			end
+		else
+			AR.inviteeID = nil
+			AR.inviteeGuildID = nil
 		end
   end
 
@@ -682,7 +685,8 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 	for guild=1, GetNumGuilds() do
 
 		if AR.settings.welcomeText[guild] ~= nil and AR.settings.welcomeText[guild] ~= "" then
-			local message = string.gsub(AR.settings.welcomeText[guild], "@", AR.inviteeID, 1)
+			local inviteeID = AR.inviteeID or ""
+			local message = string.gsub(AR.settings.welcomeText[guild], "@", inviteeID, 1)
 			message = string.gsub(message, "%W", "")
 			local messageAnon = string.gsub(string.gsub(AR.settings.welcomeText[guild], ", @", "", 1), " @", "", 1)
 			messageAnon = string.gsub(messageAnon, "%W", "")
@@ -695,10 +699,12 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 					ZO_ChatWindowTextEntryEditBox:Clear()
 				end
 
-				if AR.settings.mailMode[guild] == "Ask" then
-					ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {AR.inviteeID, GetGuildName(AR.inviteeGuildID)}})
-				elseif AR.settings.mailMode[guild] == "Automatic" then
-					AR.sendMail(AR.inviteeGuildID, AR.inviteeID)
+				if AR.inviteeID ~= nil and AR.inviteeGuildID ~= nil then
+					if AR.settings.mailMode[guild] == "Ask" then
+						ZO_Dialogs_ShowPlatformDialog("AUTORECRUIT_SHOW_MAIL", {}, {mainTextParams = {AR.inviteeID, GetGuildName(AR.inviteeGuildID)}})
+					elseif AR.settings.mailMode[guild] == "Automatic" then
+						AR.sendMail(AR.inviteeGuildID, AR.inviteeID)
+					end
 				end
 			end
 		end
