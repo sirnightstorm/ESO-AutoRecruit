@@ -1,8 +1,8 @@
 ## Title: Auto Recruit
 ## Description: Guild recruiting made easy!
-## Author: |c6C00FFpeniku8|r, |c4444CCSirNightstorm|r
-## Version: 3.3.0
-## APIVersion: 101048 101049
+## Author: |c6C00FFpeniku8|r, |c9999FFSirNightstorm|r
+## Version: 3.3.2
+## APIVersion: 101049 101050
 ## SavedVariables: AutoRecruitSavedVars AutoRecruitLastPosted
 ## DependsOn: LibAddonMenu-2.0>=41 LibCustomMenu>=730
 
