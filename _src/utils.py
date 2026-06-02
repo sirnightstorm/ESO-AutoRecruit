@@ -4,6 +4,7 @@ import shutil
 import os
 import sys
 import re
+import time
 
 def copy(wildcard, dest):
     for file in glob.glob(wildcard):
@@ -89,7 +90,7 @@ def reload_eso(reloadui_keys):
         win.restore()
         win.set_focus()
 
-        # sleep(1)
+        time.sleep(0.2)
 
         active_app = Application().connect(active_only=True)
         active_win = active_app.top_window()
