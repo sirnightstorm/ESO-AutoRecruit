@@ -41,7 +41,6 @@ AR.defaults = {
     includedZones = "Major",
     saveLastPosted = false,
 
-    guild1 = false,
     ad = {"", "", "", "", ""},
     guild = {},
     welcome = {},
@@ -297,28 +296,36 @@ end
     end
   end
 
-
-  function AR.getZones()
-	  AR.zones = {}
+function AR.getZones()
+    AR.zones = {}
     local minSkyshards = (AR.settings.includedZones == "All") and 0 or 15
 
     for i = 1, GetNumMaps() do
-      local _, _, _, zoneIndex, _ = GetMapInfoByIndex(i)
-      local zoneID = GetZoneId(zoneIndex)
-	  -- Include parent zones, plus Apocrypha, Arteum and Solstice;
-	  -- exclude "Clean Test", Cyrodiil and Imperial City
-      if (zoneID == GetParentZoneId(zoneID) or zoneID==1413 or zoneID==1027 or zoneID == 1502) and
-					(GetNumSkyshardsInZone(zoneID)>=minSkyshards or zoneID == 1502) and
-          zoneID~=181 and zoneID~=584 and zoneID~=2 and CanJumpToPlayerInZone(zoneID) then
-        table.insert(AR.zones, zoneID)
-      end
+        local _, _, _, zoneIndex, _ = GetMapInfoByIndex(i)
+        local zoneID = GetZoneId(zoneIndex)
+        local skyshards = GetNumSkyshardsInZone(zoneID)
+        -- Include parent zones, plus Apocrypha, Arteum and Solstice;
+        -- exclude "Clean Test", Cyrodiil and Imperial City
+        if (zoneID == GetParentZoneId(zoneID) or zoneID == 1413 or zoneID == 1027 or zoneID == 1502) and
+           (skyshards >= minSkyshards or zoneID == 1502) and
+           zoneID ~= 181 and zoneID ~= 584 and zoneID ~= 2 and CanJumpToPlayerInZone(zoneID) then
+            table.insert(AR.zones, {
+                id = zoneID,
+                name = GetZoneNameById(zoneID),
+                skyshards = skyshards
+            })
+        end
     end
 
-		if minSkyshards == 0 then
-			-- The Brass Fortress is a separate zone chat area, but not on a top-level map
-			table.insert(AR.zones, 981)
-		end
-  end
+    if minSkyshards == 0 then
+        -- The Brass Fortress is a separate zone chat area, but not on a top-level map
+        table.insert(AR.zones, {
+            id = 981,
+            name = GetZoneNameById(981),
+            skyshards = 0
+        })
+    end
+end
 
 
   function AR.getOnlinePlayers()
@@ -337,31 +344,41 @@ end
     end
   end
 
-  function AR.getHouses()
-    AR.zoneHouses = {}
+function AR.getHouses()
     local function IsHousingCat(categoryData)
-      return categoryData:IsHousingCategory()
+        return categoryData:IsHousingCategory()
     end
-  
+
     local function IsHouseCollectible(collectibleData)
-      return collectibleData:IsCategoryType(COLLECTIBLE_CATEGORY_TYPE_HOUSE)
+        return collectibleData:IsCategoryType(COLLECTIBLE_CATEGORY_TYPE_HOUSE)
     end
-  
-    for _, categoryData in ZO_COLLECTIBLE_DATA_MANAGER:CategoryIterator({IsHousingCat}) do
-      for _, subCategoryData in categoryData:SubcategoryIterator({IsHousingCat}) do
-        for _, subCatCollectibleData in subCategoryData:CollectibleIterator({IsHouseCollectible}) do
-          if subCatCollectibleData:IsUnlocked() and not subCatCollectibleData:IsBlocked() then
-            local houseID = subCatCollectibleData:GetReferenceId()
-            local zoneID = GetHouseFoundInZoneId(houseID)
-            if not AR.zoneHouses[zoneID] then
-              local name, _, _, _, _, _, _, _, _ = GetCollectibleInfo(subCatCollectibleData:GetId())
-              AR.zoneHouses[zoneID] = { houseID, name }
+
+    for _, categoryData in ZO_COLLECTIBLE_DATA_MANAGER:CategoryIterator({ IsHousingCat }) do
+        for _, subCategoryData in categoryData:SubcategoryIterator({ IsHousingCat }) do
+            for _, subCatCollectibleData in subCategoryData:CollectibleIterator({ IsHouseCollectible }) do
+                if subCatCollectibleData:IsUnlocked() and not subCatCollectibleData:IsBlocked() then
+                    local houseID = subCatCollectibleData:GetReferenceId()
+                    local zoneID = GetHouseFoundInZoneId(houseID)
+
+                    local zone = AR.getZoneById(zoneID)
+                    if zone and not zone.house then
+                        local name, _, _, _, _, _, _, _, _ = GetCollectibleInfo(subCatCollectibleData:GetId())
+                        zone.house = { id = houseID, name = name }
+                    end
+                end
             end
-          end
         end
-      end
     end
-  end
+end
+
+function AR.getZoneById(id)
+    for _, zone in ipairs(AR.zones) do
+        if zone.id == id then
+            return zone
+        end
+    end
+    return nil
+end
   
   function AutoRecruitKeybind.start()
   	AR.status = 1
@@ -487,10 +504,10 @@ em:RegisterForEvent("AutoRecruitInitialize", EVENT_ADD_ON_LOADED, function(...) 
 
 
 
-function AR.afterPort(destination)
+function AR.afterPort(zone)
 	em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
 
-	if GetUnitWorldPosition("player") == destination then
+	if GetUnitWorldPosition("player") == zone.id then
 		AR.failed = 0
 		AR.portingTo = nil
 		
@@ -499,20 +516,18 @@ function AR.afterPort(destination)
 		end
 
 		if AR.status == 1 and AR.settings.portMode == "Full-auto" then AR.start() end
+    else
+        d(zo_strformat("|c6C00FFAuto Recruit - |cFFFFFFPort arrival mismatch <<1>> vs <<2>>(<<3>>)", GetUnitWorldPosition("player"), zone.id, zone.name))
 	end
 end
 
-
-
-function AR.portFailed(destination)
-	local zoneName = GetZoneNameById(destination)
-
-	if AR.status == 1 then
-	  d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFFailed to port to <<1>> trying again...", zoneName))
-		AR.portingTo = nil
-	  AR.nextZone = AR.nextZone - 1
-	  AR.start()
-	end
+function AR.portFailed(zone)
+    if AR.status == 1 then
+        d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFFailed to port to <<1>> trying again...", zone.name))
+        AR.portingTo = nil
+        AR.nextZone = AR.nextZone - 1
+        AR.start()
+    end
 end
 
 function AR.keepPorting()
@@ -544,111 +559,132 @@ function AR.keepPorting()
 end
 
 function AR.start()
-	if AR.status == 0 then return end
+    if AR.status == 0 then
+        return
+    end
 
-	if AR.status == 2 then
-		d("|c6C00FFAuto Port - |cFFFFFFStarting another loop now...")
-	end
+    if AR.status == 2 then
+        d("|c6C00FFAuto Port - |cFFFFFFStarting another loop now...")
+    end
 
-  CancelCast()
-	em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
-	AR.status = 1
+    CancelCast()
+    em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
+    AR.status = 1
 
+    AR.getZones()
 
-  if AR.nextZone > #AR.zones then
-  	AR.status = 2
-  	AR.nextZone = 1
-  	d("|c6C00FFAuto Port - |cFFFFFFLoop finished")
+    if AR.nextZone > #AR.zones then
+        AR.status = 2
+        AR.nextZone = 1
+        d("|c6C00FFAuto Port - |cFFFFFFLoop finished")
 
-  	if AR.settings.keepPorting then
-			AR.keepPorting()
-  	end
+        if AR.settings.keepPorting then
+            AR.keepPorting()
+        end
 
-	  AR.RefreshWindow()
-  	return
-  end
+        AR.RefreshWindow()
+        return
+    end
 
-  AR.getOnlinePlayers()
-  AR.getHouses()
-  local nextZoneName = GetZoneNameById(AR.zones[AR.nextZone])
-  local guild = AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
-  local ownZone = GetUnitWorldPosition("player")
+    AR.getOnlinePlayers()
+    AR.getHouses()
+    local nextZoneName = AR.zones[AR.nextZone].name
+    local guild = AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
+    local ownZone = GetUnitWorldPosition("player")
 
-  if AR.nextZone == 1 then
-  	AR.lastRound = GetTimeStamp()
-  end
+    if AR.nextZone == 1 then
+        AR.lastRound = GetTimeStamp()
+    end
 
-  if ownZone == AR.zones[AR.nextZone] then
-  	AR.nextZone = AR.nextZone + 1
-  end
+    if ownZone == AR.zones[AR.nextZone].id then
+        AR.nextZone = AR.nextZone + 1
+    end
 
- 	if AR.lastPosted[nextZoneName] and AR.settings.skipZoneOnCD then
- 		local cooldown = AR.settings.adCooldown[guild]*60-(GetTimeStamp()-AR.lastPosted[nextZoneName])
- 		
- 		if cooldown>10 then
- 			d(zo_strformat("|c6C00FFAuto Port - |cFFFFFF<<1>> is still on cooldown. Skipping this zone...", nextZoneName))
-  		AR.nextZone = AR.nextZone + 1
-  		AR.start()
- 		  return
- 		end
- 	end
+    if AR.lastPosted[nextZoneName] and AR.settings.skipZoneOnCD then
+        local cooldown = AR.settings.adCooldown[guild] * 60 - (GetTimeStamp() - AR.lastPosted[nextZoneName])
 
+        if cooldown > 10 then
+            d(zo_strformat("|c6C00FFAuto Port - |cCCCCCC<<1>> is still on cooldown. Skipping this zone...", nextZoneName))
+            AR.nextZone = AR.nextZone + 1
+            AR.start()
+            return
+        end
+    end
 
-  for i=1, #AR.onlinePlayers do
-  	local userID = AR.onlinePlayers[i][1]
-  	local userZone = AR.onlinePlayers[i][2]
+    local userID = AR.GetPlayerInZoneID(AR.zones[AR.nextZone].id)
+    if userID then
+        AR.PortToPlayer(userID, AR.zones[AR.nextZone])
+        return
+    end
 
-  	if userZone == AR.zones[AR.nextZone] and ownZone ~= userZone then
-  		d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", userID, GetZoneNameById(userZone)))
-  		AR.nextZone = AR.nextZone + 1
-			AR.portingTo = GetZoneNameById(userZone)
-  		zo_callLater(function() JumpToGuildMember(userID) end, 100)
-    	em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function() AR.afterPort(userZone) end)
-    	zo_callLater(function()
-    		if ownZone==GetUnitWorldPosition("player") and userZone == AR.zones[AR.nextZone-1] then
-    			if AR.failed<3 then
-    		    AR.failed = AR.failed + 1
-    		    AR.portFailed(userZone)
-    		   else
-    		   	d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", GetZoneNameById(userZone)))
-    		   	AR.stop()
-    		  end
-    		end
-    	end, 10000)
-		  AR.RefreshWindow()
-  		return
-  	end
-  end
+    local house = AR.zones[AR.nextZone].house
+    if house and CanJumpToHouseFromCurrentLocation() then
+        AR.PortToHouse(AR.zones[AR.nextZone])
+        return
+    end
 
-  local houseId = AR.zoneHouses[AR.zones[AR.nextZone]] --AR.HM:GetHouseIDFromZoneID(AR.zones[AR.nextZone])
-	if houseId and CanJumpToHouseFromCurrentLocation() then
-		local houseZone = AR.zones[AR.nextZone]
-    local houseID, houseName = unpack(AR.zoneHouses[houseZone])
-		d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", houseName, nextZoneName))
-		AR.nextZone = AR.nextZone + 1
-		AR.portingTo = nextZoneName
-		zo_callLater(function() RequestJumpToHouse(houseID, true) end, 100)
-		em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function() AR.afterPort(houseZone) end)
-		AR.RefreshWindow()
-		return
-	end
-
-	d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFCould not port to <<1>>. Skipping this zone...", nextZoneName))
-  AR.nextZone = AR.nextZone + 1
-  AR.start()
+    d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Could not port to <<1>>. Skipping this zone...", nextZoneName))
+    AR.nextZone = AR.nextZone + 1
+    AR.start()
 end
-
-
 
 function AR.stop()
-	CancelCast()
-	em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
-  AR.status = 0
-	d("|c6C00FFAuto Port - |cFFFFFFStopped porting.")
-	AR.RefreshWindow()
+    CancelCast()
+    em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
+    AR.status = 0
+    d("|c6C00FFAuto Port - |cFFFFFFStopped porting.")
+    AR.RefreshWindow()
 end
 
+function AR.GetPlayerInZoneID(zoneID)
+    for i = 1, #AR.onlinePlayers do
+        local userID = AR.onlinePlayers[i][1]
+        local userZoneID = AR.onlinePlayers[i][2]
 
+        if userZoneID == AR.zones[AR.nextZone].id then
+            return userID
+        end
+    end
+    return nil
+end
+
+function AR.PortToPlayer(userID, zone)
+    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", userID, zone.name))
+    local oldZoneId = GetUnitWorldPosition("player")
+    AR.nextZone = AR.nextZone + 1
+    AR.portingTo = zone.name
+    zo_callLater(function()
+        JumpToGuildMember(userID)
+    end, 100)
+    em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function()
+        AR.afterPort(zone)
+    end)
+    zo_callLater(function()
+        if GetUnitWorldPosition("player") == oldZoneId and zone.id == AR.zones[AR.nextZone - 1].id then
+            if AR.failed < 3 then
+                AR.failed = AR.failed + 1
+                AR.portFailed(zone)
+            else
+                d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zone.name))
+                AR.stop()
+            end
+        end
+    end, 10000)
+    AR.RefreshWindow()
+end
+
+function AR.PortToHouse(zone)
+    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", zone.house.name, zone.name))
+    AR.nextZone = AR.nextZone + 1
+    AR.portingTo = zone.name
+    zo_callLater(function()
+        RequestJumpToHouse(zone.house.id, true)
+    end, 100)
+    em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function()
+        AR.afterPort(zone)
+    end)
+    AR.RefreshWindow()
+end
 
 function AR.chatMessage(_, channel, _, text, _, userID)
 	if not text or string.len(text) < 1 then return end
@@ -711,7 +747,7 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 	end
 
 
-	if channel == 31 and AR.status == 1 and AR.settings.portMode == "Semi-auto" and GetUnitWorldPosition("player") == AR.zones[AR.nextZone-1]
+	if channel == 31 and AR.status == 1 and AR.settings.portMode == "Semi-auto" and GetUnitWorldPosition("player") == AR.zones[AR.nextZone-1].id
 	   and userID == GetDisplayName() and text == AR.settings.ad[AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))] then
 	 AR.start()
 	end
