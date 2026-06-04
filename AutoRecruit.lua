@@ -10,7 +10,6 @@ AR.inviteeID = "@"
 AR.posted = ""
 AR.lastPosted = {}
 AR.doubleCheck = 0
-AR.onlinePlayers = {}
 AR.zones = {}
 AR.nextZone = 1
 AR.status = 0
@@ -327,24 +326,7 @@ function AR.getZones()
     end
 end
 
-
-  function AR.getOnlinePlayers()
-  	AR.onlinePlayers = {}
-  	for guild=1, GetNumGuilds() do
-  		local guildID = GetGuildId(guild)
-
-  		for i=1, GetNumGuildMembers(guildID) do
-  			local userID, _, _, playerStatus = GetGuildMemberInfo(guildID, i)
-
-  			if playerStatus~=4 and userID~=GetDisplayName() then
-  			  local _, _, _, _, _, _, _, zoneID = GetGuildMemberCharacterInfo(guildID, i)
-  			  table.insert(AR.onlinePlayers, { userID, zoneID })
-  			end
-    	end
-    end
-  end
-
-function AR.getHouses()
+function AR.GetHouseInZoneID(zoneID)
     local function IsHousingCat(categoryData)
         return categoryData:IsHousingCategory()
     end
@@ -358,12 +340,9 @@ function AR.getHouses()
             for _, subCatCollectibleData in subCategoryData:CollectibleIterator({ IsHouseCollectible }) do
                 if subCatCollectibleData:IsUnlocked() and not subCatCollectibleData:IsBlocked() then
                     local houseID = subCatCollectibleData:GetReferenceId()
-                    local zoneID = GetHouseFoundInZoneId(houseID)
-
-                    local zone = AR.getZoneById(zoneID)
-                    if zone and not zone.house then
+                    if GetHouseFoundInZoneId(houseID) == zoneID then
                         local name, _, _, _, _, _, _, _, _ = GetCollectibleInfo(subCatCollectibleData:GetId())
-                        zone.house = { id = houseID, name = name }
+                        return { id = houseID, name = name }
                     end
                 end
             end
@@ -586,8 +565,6 @@ function AR.start()
         return
     end
 
-    AR.getOnlinePlayers()
-    AR.getHouses()
     local nextZoneName = AR.zones[AR.nextZone].name
     local guild = AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
     local ownZone = GetUnitWorldPosition("player")
@@ -611,15 +588,15 @@ function AR.start()
         end
     end
 
-    local userID = AR.GetPlayerInZoneID(AR.zones[AR.nextZone].id)
+    local userID = AR.GetGuildPlayerInZoneID(AR.zones[AR.nextZone].id)
     if userID then
         AR.PortToPlayer(userID, AR.zones[AR.nextZone])
         return
     end
 
-    local house = AR.zones[AR.nextZone].house
+    local house = AR.GetHouseInZoneID(AR.zones[AR.nextZone].id)
     if house and CanJumpToHouseFromCurrentLocation() then
-        AR.PortToHouse(AR.zones[AR.nextZone])
+        AR.PortToHouse(house, AR.zones[AR.nextZone])
         return
     end
 
@@ -636,13 +613,19 @@ function AR.stop()
     AR.RefreshWindow()
 end
 
-function AR.GetPlayerInZoneID(zoneID)
-    for i = 1, #AR.onlinePlayers do
-        local userID = AR.onlinePlayers[i][1]
-        local userZoneID = AR.onlinePlayers[i][2]
+function AR.GetGuildPlayerInZoneID(zoneID)
+    for guild=1, GetNumGuilds() do
+        local guildID = GetGuildId(guild)
 
-        if userZoneID == AR.zones[AR.nextZone].id then
-            return userID
+        for i=1, GetNumGuildMembers(guildID) do
+            local userID, _, _, playerStatus = GetGuildMemberInfo(guildID, i)
+
+            if playerStatus~=4 and userID~=GetDisplayName() then
+                local _, _, _, _, _, _, _, playerZoneID = GetGuildMemberCharacterInfo(guildID, i)
+                if playerZoneID == zoneID then
+                    return userID
+                end
+            end
         end
     end
     return nil
@@ -660,25 +643,28 @@ function AR.PortToPlayer(userID, zone)
         AR.afterPort(zone)
     end)
     zo_callLater(function()
-        if GetUnitWorldPosition("player") == oldZoneId and zone.id == AR.zones[AR.nextZone - 1].id then
+        if GetUnitWorldPosition("player") == oldZoneId then
             if AR.failed < 3 then
                 AR.failed = AR.failed + 1
                 AR.portFailed(zone)
             else
-                d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zone.name))
-                AR.stop()
+                d(zo_strformat("|c6C00FFAuto Port - |cFF9999Failed to port to <<1>>. Skipping this zone...", zone.name))
+                AR.nextZone = AR.nextZone + 1
+                AR.start()
+                --d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zone.name))
+                --AR.stop()
             end
         end
     end, 10000)
     AR.RefreshWindow()
 end
 
-function AR.PortToHouse(zone)
-    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", zone.house.name, zone.name))
+function AR.PortToHouse(house, zone)
+    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", house.name, zone.name))
     AR.nextZone = AR.nextZone + 1
     AR.portingTo = zone.name
     zo_callLater(function()
-        RequestJumpToHouse(zone.house.id, true)
+        RequestJumpToHouse(house.id, true)
     end, 100)
     em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function()
         AR.afterPort(zone)
