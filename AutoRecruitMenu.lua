@@ -22,7 +22,7 @@ function AR.MakeMenu()
 	}
 
   local function currentGuild()
-    return AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
+    return AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))
   end
 
   local optionsTable = {

@@ -83,7 +83,7 @@ local function getActivityMessage()
 		local s = zo_strformat("Auto-Port <<1>>/<<2>>", AR.nextZone - 1, #AR.zones)
 		if AR.portingTo then
 			s = s .. zo_strformat(" - |c9DA2FFporting to <<1>>|r", AR.portingTo)
-		elseif ZO_ChatWindowTextEntryEditBox:GetText() == AR.settings.ad[AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))] then
+		elseif ZO_ChatWindowTextEntryEditBox:GetText() == AR.settings.ad[AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))] then
 			s = s .. " - |cFAD20Ewaiting to post|r"
 		end
 		return s, true
@@ -95,7 +95,7 @@ function AR.RefreshWindow()
 	local text, active = getActivityMessage()
 	local recruitFor = AR.settings.recruitFor
 	if AR.settings.showPending then
-		local pending = GetGuildFinderNumGuildApplications(AR.getIDfromName(AR.settings.recruitFor))
+		local pending = GetGuildFinderNumGuildApplications(AR.GetGuildIDFromName(AR.settings.recruitFor))
 		if pending > 0 then
 			recruitFor = recruitFor .. " |c66ff66(" .. pending
 			recruitFor = recruitFor .. (pending > 1 and " applications pending)|r" or " application pending)|r")

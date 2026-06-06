@@ -52,16 +52,16 @@ AR.defaults = {
 }
 
 
-	function AR.getIDfromName(guildname)
+	function AR.GetGuildIDFromName(guildname)
 		for guild = 1, GetNumGuilds() do
 		  if guildname == GetGuildName(GetGuildId(guild))
 		   then return GetGuildId(guild)
 	    end
 	  end
 	end
-	
 
-	function AR.getGuildIndex(guildID)
+
+	function AR.GetGuildIndex(guildID)
 		for guild = 1, GetNumGuilds() do
 		  if guildID == GetGuildId(guild) then
 		  	return guild
@@ -131,7 +131,7 @@ AR.defaults = {
 	end
 
   function AutoRecruitKeybind.openMail()
-		local guild = AR.getGuildIndex(AR.inviteeGuildID)
+		local guild = AR.GetGuildIndex(AR.inviteeGuildID)
 		if AR.settings.mailMode[guild] == "Disabled" then
 			d("|c6C00FFAuto Recruit - |cFF8174Guild does not have a welcome mail enabled.")
 		elseif #AR.inviteeID < 2 then
@@ -172,7 +172,7 @@ function AR.substitutePlaceholders(text, userID)
 end
 
   function AR.pasteWelcomeMessage(guildID, userID)
-		local guild = AR.getGuildIndex(guildID)
+		local guild = AR.GetGuildIndex(guildID)
 
 		if GetGuildMemberIndexFromDisplayName(guildID, userID) then
 			local message = AR.substitutePlaceholders(AR.settings.welcomeText[guild], userID)
@@ -193,7 +193,7 @@ end
 	end
 
 	function AR.createMail(guildID, userID)
-		local guildIndex = AR.getGuildIndex(guildID)
+		local guildIndex = AR.GetGuildIndex(guildID)
 		local subject = AR.substitutePlaceholders(AR.settings.mailSubject[guildIndex], userID)
 		local body = AR.substitutePlaceholders(AR.settings.mailBody[guildIndex], userID)
 
@@ -213,7 +213,7 @@ end
 			return
 		end
 
-		local guildIndex = AR.getGuildIndex(guildID)
+		local guildIndex = AR.GetGuildIndex(guildID)
 		local subject = AR.substitutePlaceholders(AR.settings.mailSubject[guildIndex], userID)
 		local body = AR.substitutePlaceholders(AR.settings.mailBody[guildIndex], userID)
 
@@ -225,12 +225,12 @@ end
 	end
 
   function AR.memberAdded(_, guildID, userID)
-  	local guild = AR.getGuildIndex(guildID)
+  	local guild = AR.GetGuildIndex(guildID)
 
   	if AR.settings.notifications then
   		CHAT_SYSTEM:Maximize()
     	for i=1, GetNumGuilds() do
-        if guildID == AR.getIDfromName(AR.settings.recruitFor) or guildID == GetGuildId(i) and AR.settings.guild[i] then
+        if guildID == AR.GetGuildIDFromName(AR.settings.recruitFor) or guildID == GetGuildId(i) and AR.settings.guild[i] then
          	if not GetGuildMemberIndexFromDisplayName(guildID, userID) then
          		d("|cFFFFFF" .. userID .. "|c82fa58 has been invited to " .. GetGuildName(guildID) .. ".")
    			   else
@@ -267,7 +267,7 @@ end
 
   function AR.Invite(userID)
   	local delay = math.random(2500, 10000)
-  	local guildID = AR.getIDfromName(AR.settings.recruitFor)
+  	local guildID = AR.GetGuildIDFromName(AR.settings.recruitFor)
 
   	zo_callLater(function()
   		CHAT_SYSTEM:Maximize()
@@ -487,11 +487,12 @@ function AR.afterPort(zone)
 	em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
 
 	if GetUnitWorldPosition("player") == zone.id then
+        AR.nextZone = AR.nextZone + 1
 		AR.failed = 0
 		AR.portingTo = nil
 		
 		if AR.settings.postAd then
-			AutoRecruitKeybind.pasteText(AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor)))
+			AutoRecruitKeybind.pasteText(AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor)))
 		end
 
 		if AR.status == 1 and AR.settings.portMode == "Full-auto" then AR.start() end
@@ -502,9 +503,9 @@ end
 
 function AR.portFailed(zone)
     if AR.status == 1 then
-        d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFFailed to port to <<1>> trying again...", zone.name))
+        d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFRetrying <<1>> (failed to port)", zone.name))
         AR.portingTo = nil
-        AR.nextZone = AR.nextZone - 1
+        --AR.nextZone = AR.nextZone - 1
         AR.start()
     end
 end
@@ -538,6 +539,8 @@ function AR.keepPorting()
 end
 
 function AR.start()
+    local guildIndex = AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))
+
     if AR.status == 0 then
         return
     end
@@ -546,11 +549,18 @@ function AR.start()
         d("|c6C00FFAuto Port - |cFFFFFFStarting another loop now...")
     end
 
-    CancelCast()
+    CancelCast() -- Stop any current port to zone
     em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
     AR.status = 1
 
     AR.getZones()
+
+    if AR.portingTo ~= nil then
+        -- Repeatedly pressing 'start' will move forward through the zones
+        zo_removeCallLater(AR.failCallback)
+        AR.portingTo = nil
+        AR.nextZone = AR.nextZone + 1
+    end
 
     if AR.nextZone > #AR.zones then
         AR.status = 2
@@ -565,42 +575,42 @@ function AR.start()
         return
     end
 
-    local nextZoneName = AR.zones[AR.nextZone].name
-    local guild = AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
-    local ownZone = GetUnitWorldPosition("player")
+    local playerZoneID = GetUnitWorldPosition("player")
+
+    if playerZoneID == AR.zones[AR.nextZone].id then
+        AR.nextZone = AR.nextZone + 1
+    end
+
+    local nextZone = AR.zones[AR.nextZone]
 
     if AR.nextZone == 1 then
         AR.lastRound = GetTimeStamp()
     end
 
-    if ownZone == AR.zones[AR.nextZone].id then
-        AR.nextZone = AR.nextZone + 1
-    end
-
-    if AR.lastPosted[nextZoneName] and AR.settings.skipZoneOnCD then
-        local cooldown = AR.settings.adCooldown[guild] * 60 - (GetTimeStamp() - AR.lastPosted[nextZoneName])
+    if AR.lastPosted[nextZone.name] and AR.settings.skipZoneOnCD then
+        local cooldown = AR.settings.adCooldown[guildIndex] * 60 - (GetTimeStamp() - AR.lastPosted[nextZone.name])
 
         if cooldown > 10 then
-            d(zo_strformat("|c6C00FFAuto Port - |cCCCCCC<<1>> is still on cooldown. Skipping this zone...", nextZoneName))
+            d(zo_strformat("|c6C00FFAuto Port - |cCCCCCCSkipping <<1>> (still on cooldown)", nextZone.name))
             AR.nextZone = AR.nextZone + 1
             AR.start()
             return
         end
     end
 
-    local userID = AR.GetGuildPlayerInZoneID(AR.zones[AR.nextZone].id)
+    local userID = AR.GetGuildPlayerInZoneID(nextZone.id)
     if userID then
-        AR.PortToPlayer(userID, AR.zones[AR.nextZone])
+        AR.PortToPlayer(userID, nextZone)
         return
     end
 
-    local house = AR.GetHouseInZoneID(AR.zones[AR.nextZone].id)
+    local house = AR.GetHouseInZoneID(nextZone.id)
     if house and CanJumpToHouseFromCurrentLocation() then
-        AR.PortToHouse(house, AR.zones[AR.nextZone])
+        AR.PortToHouse(house, nextZone)
         return
     end
 
-    d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Could not port to <<1>>. Skipping this zone...", nextZoneName))
+    d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Skipping <<1>> (could not port)", nextZone.name))
     AR.nextZone = AR.nextZone + 1
     AR.start()
 end
@@ -632,9 +642,9 @@ function AR.GetGuildPlayerInZoneID(zoneID)
 end
 
 function AR.PortToPlayer(userID, zone)
-    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", userID, zone.name))
+    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> in <<2>>", userID, zone.name))
     local oldZoneId = GetUnitWorldPosition("player")
-    AR.nextZone = AR.nextZone + 1
+    --AR.nextZone = AR.nextZone + 1
     AR.portingTo = zone.name
     zo_callLater(function()
         JumpToGuildMember(userID)
@@ -642,13 +652,13 @@ function AR.PortToPlayer(userID, zone)
     em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function()
         AR.afterPort(zone)
     end)
-    zo_callLater(function()
+    AR.failCallback = zo_callLater(function()
         if GetUnitWorldPosition("player") == oldZoneId then
             if AR.failed < 3 then
                 AR.failed = AR.failed + 1
                 AR.portFailed(zone)
             else
-                d(zo_strformat("|c6C00FFAuto Port - |cFF9999Failed to port to <<1>>. Skipping this zone...", zone.name))
+                d(zo_strformat("|c6C00FFAuto Port - |cFF9999Skipping <<1>> (failed to port)", zone.name))
                 AR.nextZone = AR.nextZone + 1
                 AR.start()
                 --d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zone.name))
@@ -660,8 +670,8 @@ function AR.PortToPlayer(userID, zone)
 end
 
 function AR.PortToHouse(house, zone)
-    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFJumping to <<1>> in <<2>>", house.name, zone.name))
-    AR.nextZone = AR.nextZone + 1
+    d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> in <<2>>", house.name, zone.name))
+    --AR.nextZone = AR.nextZone + 1
     AR.portingTo = zone.name
     zo_callLater(function()
         RequestJumpToHouse(house.id, true)
@@ -699,7 +709,7 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 	end
 	
 	
-  if channel == 31 and text == AR.settings.ad[AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))] then
+  if channel == 31 and text == AR.settings.ad[AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))] then
     AR.lastPosted[GetPlayerActiveZoneName()] = GetTimeStamp()
   end
   
@@ -734,7 +744,7 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 
 
 	if channel == 31 and AR.status == 1 and AR.settings.portMode == "Semi-auto" and GetUnitWorldPosition("player") == AR.zones[AR.nextZone-1].id
-	   and userID == GetDisplayName() and text == AR.settings.ad[AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))] then
+	   and userID == GetDisplayName() and text == AR.settings.ad[AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))] then
 	 AR.start()
 	end
 
