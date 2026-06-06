@@ -295,7 +295,53 @@ end
     end
   end
 
-function AR.getZones()
+local function AddZoneGuildPlayers()
+    AR.onlinePlayers = {}
+    for guild=1, GetNumGuilds() do
+        local guildID = GetGuildId(guild)
+
+        for i=1, GetNumGuildMembers(guildID) do
+            local userID, _, _, playerStatus = GetGuildMemberInfo(guildID, i)
+
+            if playerStatus~=4 and userID~=GetDisplayName() then
+                local _, _, _, _, _, _, _, zoneID = GetGuildMemberCharacterInfo(guildID, i)
+                local zone = AR.getZoneById(zoneID)
+                if zone then
+                    table.insert(zone.players, userID)
+                end
+            end
+        end
+    end
+end
+
+local function AddZoneHouses()
+    local function IsHousingCat(categoryData)
+        return categoryData:IsHousingCategory()
+    end
+
+    local function IsHouseCollectible(collectibleData)
+        return collectibleData:IsCategoryType(COLLECTIBLE_CATEGORY_TYPE_HOUSE)
+    end
+
+    for _, categoryData in ZO_COLLECTIBLE_DATA_MANAGER:CategoryIterator({ IsHousingCat }) do
+        for _, subCategoryData in categoryData:SubcategoryIterator({ IsHousingCat }) do
+            for _, subCatCollectibleData in subCategoryData:CollectibleIterator({ IsHouseCollectible }) do
+                if subCatCollectibleData:IsUnlocked() and not subCatCollectibleData:IsBlocked() then
+                    local houseID = subCatCollectibleData:GetReferenceId()
+                    local zoneID = GetHouseFoundInZoneId(houseID)
+
+                    local zone = AR.getZoneById(zoneID)
+                    if zone and not zone.house then
+                        local name, _, _, _, _, _, _, _, _ = GetCollectibleInfo(subCatCollectibleData:GetId())
+                        zone.house = { id = houseID, name = name }
+                    end
+                end
+            end
+        end
+    end
+end
+
+function AR.GetZones()
     AR.zones = {}
     local minSkyshards = (AR.settings.includedZones == "All") and 0 or 15
 
@@ -311,7 +357,9 @@ function AR.getZones()
             table.insert(AR.zones, {
                 id = zoneID,
                 name = GetZoneNameById(zoneID),
-                skyshards = skyshards
+                skyshards = skyshards,
+                players = {},
+                house = nil
             })
         end
     end
@@ -321,33 +369,14 @@ function AR.getZones()
         table.insert(AR.zones, {
             id = 981,
             name = GetZoneNameById(981),
-            skyshards = 0
+            skyshards = 0,
+            players = {},
+            house = nil
         })
     end
-end
 
-function AR.GetHouseInZoneID(zoneID)
-    local function IsHousingCat(categoryData)
-        return categoryData:IsHousingCategory()
-    end
-
-    local function IsHouseCollectible(collectibleData)
-        return collectibleData:IsCategoryType(COLLECTIBLE_CATEGORY_TYPE_HOUSE)
-    end
-
-    for _, categoryData in ZO_COLLECTIBLE_DATA_MANAGER:CategoryIterator({ IsHousingCat }) do
-        for _, subCategoryData in categoryData:SubcategoryIterator({ IsHousingCat }) do
-            for _, subCatCollectibleData in subCategoryData:CollectibleIterator({ IsHouseCollectible }) do
-                if subCatCollectibleData:IsUnlocked() and not subCatCollectibleData:IsBlocked() then
-                    local houseID = subCatCollectibleData:GetReferenceId()
-                    if GetHouseFoundInZoneId(houseID) == zoneID then
-                        local name, _, _, _, _, _, _, _, _ = GetCollectibleInfo(subCatCollectibleData:GetId())
-                        return { id = houseID, name = name }
-                    end
-                end
-            end
-        end
-    end
+    AddZoneGuildPlayers()
+    AddZoneHouses()
 end
 
 function AR.getZoneById(id)
@@ -433,7 +462,7 @@ function AR.Initialize(_, addon)
 	ZO_CreateStringId("SI_BINDING_NAME_AUTO_RECRUIT_MAIL", "Open Welcome mail form")
 
 	AR.MakeMenu()
-	AR.getZones()
+	AR.GetZones()
 
 	em:RegisterForEvent("AutoRecruitStart", EVENT_PLAYER_ACTIVATED, function(...) AR.RefreshWindow(...) end)
   em:RegisterForEvent("AutoRecruitStart", EVENT_CHAT_MESSAGE_CHANNEL, AR.chatMessage)
@@ -553,7 +582,7 @@ function AR.start()
     em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
     AR.status = 1
 
-    AR.getZones()
+    AR.GetZones()
 
     if AR.portingTo ~= nil then
         -- Repeatedly pressing 'start' will move forward through the zones
@@ -598,15 +627,14 @@ function AR.start()
         end
     end
 
-    local userID = AR.GetGuildPlayerInZoneID(nextZone.id)
-    if userID then
-        AR.PortToPlayer(userID, nextZone)
+    if #nextZone.players > 0 then
+        local playerIndex = math.random(1, #nextZone.players)
+        AR.PortToPlayer(nextZone.players[playerIndex], nextZone)
         return
     end
 
-    local house = AR.GetHouseInZoneID(nextZone.id)
-    if house and CanJumpToHouseFromCurrentLocation() then
-        AR.PortToHouse(house, nextZone)
+    if nextZone.house and CanJumpToHouseFromCurrentLocation() then
+        AR.PortToHouse(nextZone.house, nextZone)
         return
     end
 
@@ -617,28 +645,11 @@ end
 
 function AR.stop()
     CancelCast()
+    AR.portingTo = nil
     em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
     AR.status = 0
     d("|c6C00FFAuto Port - |cFFFFFFStopped porting.")
     AR.RefreshWindow()
-end
-
-function AR.GetGuildPlayerInZoneID(zoneID)
-    for guild=1, GetNumGuilds() do
-        local guildID = GetGuildId(guild)
-
-        for i=1, GetNumGuildMembers(guildID) do
-            local userID, _, _, playerStatus = GetGuildMemberInfo(guildID, i)
-
-            if playerStatus~=4 and userID~=GetDisplayName() then
-                local _, _, _, _, _, _, _, playerZoneID = GetGuildMemberCharacterInfo(guildID, i)
-                if playerZoneID == zoneID then
-                    return userID
-                end
-            end
-        end
-    end
-    return nil
 end
 
 function AR.PortToPlayer(userID, zone)

@@ -131,7 +131,7 @@ function AR.MakeMenu()
       end,
       setFunc = function(value)
         AR.settings.includedZones = value
-        AR.getZones()
+        AR.GetZones()
       end,
       width = "full",
       default = AR.defaults.includedZones,
