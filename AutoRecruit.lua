@@ -307,6 +307,9 @@ local function AddZoneGuildPlayers()
                 local _, _, _, _, _, _, _, zoneID = GetGuildMemberCharacterInfo(guildID, i)
                 local zone = AR.getZoneById(zoneID)
                 if zone then
+                    if not zone.players then
+                        zone.players = {}
+                    end
                     table.insert(zone.players, userID)
                 end
             end
@@ -358,7 +361,6 @@ function AR.GetZones()
                 id = zoneID,
                 name = GetZoneNameById(zoneID),
                 skyshards = skyshards,
-                players = {},
                 house = nil
             })
         end
@@ -370,7 +372,6 @@ function AR.GetZones()
             id = 981,
             name = GetZoneNameById(981),
             skyshards = 0,
-            players = {},
             house = nil
         })
     end
@@ -627,20 +628,16 @@ function AR.start()
         end
     end
 
-    if #nextZone.players > 0 then
+    if nextZone.players then
         local playerIndex = math.random(1, #nextZone.players)
         AR.PortToPlayer(nextZone.players[playerIndex], nextZone)
-        return
-    end
-
-    if nextZone.house and CanJumpToHouseFromCurrentLocation() then
+    elseif nextZone.house and CanJumpToHouseFromCurrentLocation() then
         AR.PortToHouse(nextZone.house, nextZone)
-        return
+    else
+        d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Skipping <<1>> (could not port)", nextZone.name))
+        AR.nextZone = AR.nextZone + 1
+        AR.start()
     end
-
-    d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Skipping <<1>> (could not port)", nextZone.name))
-    AR.nextZone = AR.nextZone + 1
-    AR.start()
 end
 
 function AR.stop()
