@@ -4,8 +4,7 @@
 ## Version: 3.3.2
 ## APIVersion: 101049 101050
 ## SavedVariables: AutoRecruitSavedVars AutoRecruitLastPosted
-## DependsOn: LibAddonMenu-2.0>=43
- LibCustomMenu>=730
+## DependsOn: LibAddonMenu-2.0>=43 LibCustomMenu>=730
 
 AutoRecruit.lua
 AutoRecruitMenu.lua
