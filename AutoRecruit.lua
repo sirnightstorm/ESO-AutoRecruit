@@ -11,9 +11,8 @@ AR.posted = ""
 AR.lastPosted = {}
 AR.doubleCheck = 0
 AR.zones = {}
-AR.nextZone = 1
+AR.runner = nil
 AR.status = 0
-AR.lastRound = 0
 AR.failed = 0
 AR.portingTo = nil
 AR.mailBoxOpen = false
@@ -396,7 +395,6 @@ end
 
 
   function AutoRecruitKeybind.stop()
-  	AR.status = 0
   	AR.stop()
   end
 
@@ -465,6 +463,8 @@ function AR.Initialize(_, addon)
 	AR.MakeMenu()
 	AR.GetZones()
 
+    AR.runner = AR.DynamicRunner:New()
+
 	em:RegisterForEvent("AutoRecruitStart", EVENT_PLAYER_ACTIVATED, function(...) AR.RefreshWindow(...) end)
   em:RegisterForEvent("AutoRecruitStart", EVENT_CHAT_MESSAGE_CHANNEL, AR.chatMessage)
   em:RegisterForEvent("AutoRecruitStart", EVENT_ACTION_LAYER_POPPED, AR.chatMessage)
@@ -517,7 +517,7 @@ function AR.afterPort(zone)
 	em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
 
 	if GetUnitWorldPosition("player") == zone.id then
-        AR.nextZone = AR.nextZone + 1
+        AR.runner:OnPortSucceeded()
 		AR.failed = 0
 		AR.portingTo = nil
 		
@@ -532,10 +532,10 @@ function AR.afterPort(zone)
 end
 
 function AR.portFailed(zone)
+    AR.runner:OnPortFailed()
     if AR.status == 1 then
         d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFRetrying <<1>> (failed to port)", zone.name))
         AR.portingTo = nil
-        --AR.nextZone = AR.nextZone - 1
         AR.start()
     end
 end
@@ -543,7 +543,7 @@ end
 function AR.keepPorting()
 	if AR.status ~= 2 then return end
 
-	local delay = AR.settings.portingTime*60-(GetTimeStamp()-AR.lastRound)
+	local delay = AR.runner:GetNextRoundDelay()
 
 	if delay<=5 then
 		AR.start()
@@ -569,9 +569,9 @@ function AR.keepPorting()
 end
 
 function AR.start()
-    local guildIndex = AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))
+    --local guildIndex = AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))
 
-    if AR.status == 0 then
+    if AR.status == 0 or not AR.runner then
         return
     end
 
@@ -589,13 +589,21 @@ function AR.start()
         -- Repeatedly pressing 'start' will move forward through the zones
         zo_removeCallLater(AR.failCallback)
         AR.portingTo = nil
-        AR.nextZone = AR.nextZone + 1
+        AR.runner:Forward()
     end
 
-    if AR.nextZone > #AR.zones then
+    local playerZoneID = GetUnitWorldPosition("player")
+
+    local nextZone = AR.runner:GetNextZone()
+
+    if nextZone and playerZoneID == nextZone.id then
+        AR.runner:Forward()
+        nextZone = AR.runner:GetNextZone()
+    end
+
+    if not nextZone then
         AR.status = 2
-        AR.nextZone = 1
-        d("|c6C00FFAuto Port - |cFFFFFFLoop finished")
+        AR.runner:Reset()
 
         if AR.settings.keepPorting then
             AR.keepPorting()
@@ -605,44 +613,27 @@ function AR.start()
         return
     end
 
-    local playerZoneID = GetUnitWorldPosition("player")
-
-    if playerZoneID == AR.zones[AR.nextZone].id then
-        AR.nextZone = AR.nextZone + 1
-    end
-
-    local nextZone = AR.zones[AR.nextZone]
-
-    if AR.nextZone == 1 then
-        AR.lastRound = GetTimeStamp()
-    end
-
-    if AR.lastPosted[nextZone.name] and AR.settings.skipZoneOnCD then
-        local cooldown = AR.settings.adCooldown[guildIndex] * 60 - (GetTimeStamp() - AR.lastPosted[nextZone.name])
-
-        if cooldown > 10 then
-            d(zo_strformat("|c6C00FFAuto Port - |cCCCCCCSkipping <<1>> (still on cooldown)", nextZone.name))
-            AR.nextZone = AR.nextZone + 1
-            AR.start()
-            return
-        end
-    end
-
     if nextZone.players then
         local playerIndex = math.random(1, #nextZone.players)
         AR.PortToPlayer(nextZone.players[playerIndex], nextZone)
     elseif nextZone.house and CanJumpToHouseFromCurrentLocation() then
         AR.PortToHouse(nextZone.house, nextZone)
     else
-        d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Skipping <<1>> (could not port)", nextZone.name))
-        AR.nextZone = AR.nextZone + 1
+        d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Skipping <<1>> (no destination found)", nextZone.name))
+        AR.runner:Forward()
         AR.start()
     end
 end
 
 function AR.stop()
+    if AR.portingTo ~= nil then
+        zo_removeCallLater(AR.failCallback)
+        AR.portingTo = nil
+    end
+
     CancelCast()
-    AR.portingTo = nil
+    AR.runner:Stop()
+
     em:UnregisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED)
     AR.status = 0
     d("|c6C00FFAuto Port - |cFFFFFFStopped porting.")
@@ -652,7 +643,6 @@ end
 function AR.PortToPlayer(userID, zone)
     d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> in <<2>>", userID, zone.name))
     local oldZoneId = GetUnitWorldPosition("player")
-    --AR.nextZone = AR.nextZone + 1
     AR.portingTo = zone.name
     zo_callLater(function()
         JumpToGuildMember(userID)
@@ -667,7 +657,7 @@ function AR.PortToPlayer(userID, zone)
                 AR.portFailed(zone)
             else
                 d(zo_strformat("|c6C00FFAuto Port - |cFF9999Skipping <<1>> (failed to port)", zone.name))
-                AR.nextZone = AR.nextZone + 1
+                AR.runner:Forward()
                 AR.start()
                 --d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zone.name))
                 --AR.stop()
@@ -679,7 +669,6 @@ end
 
 function AR.PortToHouse(house, zone)
     d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> in <<2>>", house.name, zone.name))
-    --AR.nextZone = AR.nextZone + 1
     AR.portingTo = zone.name
     zo_callLater(function()
         RequestJumpToHouse(house.id, true)
@@ -751,7 +740,7 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 	end
 
 
-	if channel == 31 and AR.status == 1 and AR.settings.portMode == "Semi-auto" and GetUnitWorldPosition("player") == AR.zones[AR.nextZone-1].id
+	if channel == 31 and AR.status == 1 and AR.settings.portMode == "Semi-auto" and GetUnitWorldPosition("player") == AR.runner:GetCurrentZone().id
 	   and userID == GetDisplayName() and text == AR.settings.ad[AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))] then
 	 AR.start()
 	end

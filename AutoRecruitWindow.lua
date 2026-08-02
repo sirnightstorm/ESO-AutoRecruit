@@ -66,21 +66,20 @@ end
 
 local function getActivityMessage()
 	if AR.status == 2 and AR.settings.keepPorting then
-		local delay = AR.settings.portingTime*60-(GetTimeStamp()-AR.lastRound)
+		local delay = AR.runner:GetNextRoundDelay()
 		if delay>120 then
 			return "Starting another loop in " .. math.floor(delay/60) .. " minutes...", false
 		elseif delay>60 then
 			return "Starting another loop in ~1 minute...", false
 		elseif delay>5 then
 			return "Starting another loop in " .. delay .. " seconds...", false
-		elseif delay<=5 then
+		else
 			return "Starting another loop...", true
 		end
-		return "Auto-Port queued", false
 	elseif AR.status == 2 then
 		return "Auto-Port finished", false
 	elseif AR.status == 1 then
-		local s = zo_strformat("Auto-Port <<1>>/<<2>>", AR.nextZone - 1, #AR.zones)
+		local s = zo_strformat("Auto-Port <<1>>/<<2>>", AR.runner:GetProgress(), #AR.zones)
 		if AR.portingTo then
 			s = s .. zo_strformat(" - |c9DA2FFporting to <<1>>|r", AR.portingTo)
 		elseif ZO_ChatWindowTextEntryEditBox:GetText() == AR.settings.ad[AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))] then
