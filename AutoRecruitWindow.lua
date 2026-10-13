@@ -68,11 +68,11 @@ local function getActivityMessage()
 	if AR.status == 2 and AR.settings.keepPorting then
 		local delay = AR.runner:GetNextRoundDelay()
 		if delay>120 then
-			return "Starting another loop in " .. math.floor(delay/60) .. " minutes...", false
+			return "Starting another loop in " .. math.floor(delay/60) .. " minutes...", true
 		elseif delay>60 then
-			return "Starting another loop in ~1 minute...", false
+			return "Starting another loop in ~1 minute...", true
 		elseif delay>5 then
-			return "Starting another loop in " .. delay .. " seconds...", false
+			return "Starting another loop in " .. delay .. " seconds...", true
 		else
 			return "Starting another loop...", true
 		end
