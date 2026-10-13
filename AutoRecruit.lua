@@ -657,6 +657,7 @@ function AR.PortToPlayer(userID, zone)
                 AR.portFailed(zone)
             else
                 d(zo_strformat("|c6C00FFAuto Port - |cFF9999Skipping <<1>> (failed to port)", zone.name))
+								AR.failed = AR.failed + 1
                 AR.runner:Forward()
                 AR.start()
                 --d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zone.name))
@@ -740,7 +741,7 @@ function AR.chatMessage(_, channel, _, text, _, userID)
 	end
 
 
-	if channel == 31 and AR.status == 1 and AR.settings.portMode == "Semi-auto" and GetUnitWorldPosition("player") == AR.runner:GetCurrentZone().id
+	if channel == 31 and AR.status == 1 and AR.settings.portMode == "Semi-auto" and AR.runner:GetCurrentZone() and GetUnitWorldPosition("player") == AR.runner:GetCurrentZone().id
 	   and userID == GetDisplayName() and text == AR.settings.ad[AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))] then
 	 AR.start()
 	end

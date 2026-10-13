@@ -85,4 +85,9 @@ function LoopRunner:GetNextRoundDelay()
     return AR.settings.portingTime*60 - (GetTimeStamp()-self.lastRound)
 end
 
+function LoopRunner:OnStartAnotherLoop()
+    d("|c6C00FFAuto Port - |cFFFFFFStarting another loop now...")
+end
+
+
 AR.LoopRunner = LoopRunner

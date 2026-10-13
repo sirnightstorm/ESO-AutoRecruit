@@ -60,10 +60,10 @@ local function getZonePriority(self, zone)
     local failCount = self.zoneIDFailCount[zone.id] or 0
     if zone.house then
         -- No rush to port to a zone with a house in
-        return 50 - 10 * failCount
+        return 50 - 20 * failCount
     elseif zone.players then
         -- Prioritise zones with the fewest players in
-        return 100 - #zone.players - 10 * failCount
+        return 100 - #zone.players - 20 * failCount
     else
         return -1 -- No player or house to port to
     end
@@ -83,12 +83,12 @@ function DynamicRunner:GetNextZone()
             bestPriority = p
         end
     end
-    if bestZone then
+    if bestZone and bestPriority > 0 then
         self.nextZoneID = bestZone.id
         d(zo_strformat("|c6C00FFAuto Port - |cCCFFCCChosen <<1>> (priority: <<2>>)", bestZone.name, bestPriority))
     else
         self.nextZoneID = nil
-        d(zo_strformat("|c6C00FFAuto Port - |cCCCCCCNo zones found to port to"))
+        --d(zo_strformat("|c6C00FFAuto Port - |cCCCCCCNo zones found to port to"))
     end
 
     if bestZone == nil then
@@ -122,6 +122,9 @@ end
 
 function DynamicRunner:GetNextRoundDelay()
     return 15 - (GetTimeStamp()-self.lastRound)
+end
+
+function DynamicRunner:OnStartAnotherLoop()
 end
 
 AR.DynamicRunner = DynamicRunner
