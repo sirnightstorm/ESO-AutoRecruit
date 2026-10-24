@@ -5,7 +5,7 @@ import os
 import glob
 import sys
 
-def copy(wildcard, dest):
+def copy(wildcard: str, dest: str):
     for file in glob.glob(wildcard):
         print(file)
         shutil.copy(file, dest)
