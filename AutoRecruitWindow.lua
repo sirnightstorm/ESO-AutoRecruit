@@ -3,6 +3,7 @@ local wm = GetWindowManager()
 if AutoRecruit == nil then AutoRecruit = {} end
 local AR = AutoRecruit
 
+-- INFO WINDOW
 
 function AR.MakeWindow()
 	AR.window = wm:CreateTopLevelWindow("ARWindow")
@@ -38,28 +39,95 @@ function AR.MakeWindow()
 	win.backdrop:SetAnchor(TOPLEFT, win.title, TOPLEFT, -6, -4)
 	win.backdrop:SetAnchor(BOTTOMRIGHT, win.text, BOTTOMRIGHT, 6, 4)
 	win.backdrop:SetCenterColor(0,0,0,0.75)
-	win.backdrop:SetEdgeColor(0,0,0)
+	win.backdrop:SetEdgeColor(0,0,0,0)
 
+	win.buttonList = {}
+	local cols = 4
+	local rows = math.floor((#AR.zones+cols) / cols)
+	d("AR.zones count = " .. #AR.zones)
+	for i = 1, #AR.zones do
+		--		local btn = CreateControlFromVirtual("AWBtn" .. i, win, "ZO_DefaultButton")
+		local btn = wm:CreateControl("AWBtn" .. i, win, CT_BUTTON)
+		btn:SetDimensions(76, 22)
+		btn:SetFont('ZoFontGameSmall')
+		btn:SetClickSound('Click')
+		btn:SetNormalFontColor(0.9,0.87,0.68,1)
+		btn:SetMouseOverFontColor(1,0.66,0.2,1)
+		btn:SetDisabledFontColor(0.4, 0.8, 0.4, 1)
+		btn:SetHorizontalAlignment(0)
+		btn:SetVerticalAlignment(1)
+		btn:SetText(AR.zones[i].name)
+		btn.data = { zoneIndex = i }
+		btn:SetHandler('OnClicked',function(_)
+			local zoneIndex = btn.data.zoneIndex
+			AR.PortToZone(AR.zones[zoneIndex])
+		end)
+
+		local y = math.floor((i - 1) / cols) * 22 + 4
+		local x = ((i - 1) % cols) * 80 + 2
+		btn:SetAnchor(TOPLEFT, win.title, BOTTOMLEFT, x, y)
+
+		table.insert(win.buttonList, btn)
+	end
+
+	win.btnBackdrop = wm:CreateControl(nil, win, CT_BACKDROP) --BackdropControl#BackdropControl
+	win.btnBackdrop:SetAnchor(TOPLEFT, win.backdrop, BOTTOMLEFT, 0, 0)
+	win.btnBackdrop:SetDimensions(80*cols + 6, 22*rows+4)
+	win.btnBackdrop:SetCenterColor(0,0,0,0.75)
+	win.btnBackdrop:SetEdgeColor(0,0,0,0)
+end
+
+function AR.UpdateButtons()
+	local guildIndex = AR.GetGuildIndex(AR.GetGuildIDFromName(AR.settings.recruitFor))
+	local nextZone = AR.status == 1 and AR.runner:GetNextZone() or nil
+	for i = 1, #AR.zones do
+		local zone = AR.zones[i]
+		local btn = AR.window.buttonList[i]
+		if AR.lastPosted[zone.name] then
+			local cooldown = AR.settings.adCooldown[guildIndex] * 60 - (GetTimeStamp() - AR.lastPosted[zone.name])
+			btn:SetEnabled(cooldown < 10)
+		else
+			AR.window.buttonList[i]:SetEnabled(true)
+		end
+		local col = "AAAAAA"
+		if zone == nextZone then
+			col = "FFFFFF" --"9DA2FF"
+		elseif zone.house then
+			col = "BBEEFF"
+		elseif zone.players then
+			col = "E5DAB0"
+		end
+		btn:SetNormalFontColor(ZO_ColorDef.HexToFloats(col))
+	end
+end
+
+function AR.OnCompassChanged(show)
+	AR.window:SetHidden(not AR.settings.shown or not show)
+end
+
+function AR.AddCompassFrameHandlers()
 	if ZO_CompassFrame:IsHandlerSet("OnShow") then
 		local oldHandler = ZO_CompassFrame:GetHandler("OnShow")
-		ZO_CompassFrame:SetHandler("OnShow", function(...) oldHandler(...) if AR.settings.shown then AR.window:SetHidden(false) end end)
+		ZO_CompassFrame:SetHandler("OnShow", function(...) oldHandler(...) AR.OnCompassChanged(true) end)
 	else
-		ZO_CompassFrame:SetHandler("OnShow", function(...) if AR.settings.shown then AR.window:SetHidden(false) end end)
+		ZO_CompassFrame:SetHandler("OnShow", function(...) AR.OnCompassChanged(true) end)
 	end
 	if ZO_CompassFrame:IsHandlerSet("OnHide") then
 		local oldHandler = ZO_CompassFrame:GetHandler("OnHide")
-		ZO_CompassFrame:SetHandler("OnHide", function(...) oldHandler(...) if AR.settings.shown then AR.window:SetHidden(true) end end)
+		ZO_CompassFrame:SetHandler("OnHide", function(...) oldHandler(...) AR.OnCompassChanged(false) end)
 	else
-		ZO_CompassFrame:SetHandler("OnHide", function(...) if AR.settings.shown then AR.window:SetHidden(true) end end)
+		ZO_CompassFrame:SetHandler("OnHide", function(...) AR.OnCompassChanged(false) end)
 	end
-	
 end
 
 function AR.PopulateWindow(text, active)
-	if AR.window == nil then AR.MakeWindow() end
+	if AR.window == nil then
+		AR.MakeWindow()
+		AR.AddCompassFrameHandlers()
+	end
+
 	AR.window.text:SetText(text)
-	
-	AR.window:SetHidden(ZO_CompassFrame:IsHidden() or not AR.settings.shown)
+	AR.OnCompassChanged(not ZO_CompassFrame:IsHidden())
 	AR.window.backdrop:SetHidden(not active)
 	AR.window.title:SetColor(ZO_ColorDef.HexToFloats(active and "9E33FF" or "6C00FF"))
 end
@@ -113,4 +181,6 @@ function AR.RefreshWindow()
 	end
 
 	AR.PopulateWindow(text, active)
+
+	AR.UpdateButtons()
 end

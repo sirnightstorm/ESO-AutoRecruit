@@ -640,6 +640,17 @@ function AR.stop()
     AR.RefreshWindow()
 end
 
+function AR.PortToZone(zone)
+	if zone.players then
+		local playerIndex = math.random(1, #zone.players)
+		AR.PortToPlayer(zone.players[playerIndex], zone)
+	elseif zone.house and CanJumpToHouseFromCurrentLocation() then
+		AR.PortToHouse(zone.house, zone)
+	else
+		d(zo_strformat("|c6C00FFAuto Port - |cFFCC66Skipping <<1>> (no destination found)", zone.name))
+	end
+end
+
 function AR.PortToPlayer(userID, zone)
     d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> in <<2>>", userID, zone.name))
     local oldZoneId = GetUnitWorldPosition("player")
