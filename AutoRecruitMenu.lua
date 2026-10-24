@@ -194,7 +194,7 @@ function AR.MakeMenu()
       type = "slider",
       name = "Multiple rounds cooldown",
       tooltip = "How long to wait after every round",
-      min = 5,
+      min = 1,
       max = 60,
       step = 1,
       getFunc = function()
