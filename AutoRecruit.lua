@@ -40,6 +40,7 @@ AR.defaults = {
     skipZoneOnCD = true,
     includedZones = "Major",
     saveLastPosted = false,
+		showZonesGrid = "Hidden",
 
     guild1 = false,
     ad = {"", "", "", "", ""},

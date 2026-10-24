@@ -101,6 +101,22 @@ function AR.MakeMenu()
       default = AR.defaults.showPending,
     },
 
+    {
+      type = "dropdown",
+      name = "Zones Grid",
+      tooltip = "A grid of zones: green = posted & on cooldown, grey = inaccessible)",
+      choices = { "Hidden", "Automatic", "Always show" },
+      getFunc = function()
+        return AR.settings.showZonesGrid
+      end,
+      setFunc = function(value)
+        AR.settings.showZonesGrid = value
+        AR.RefreshWindow()
+      end,
+      width = "full",
+      default = AR.defaults.showZonesGrid,
+    },
+
 
     {
       type = "header",
