@@ -61,7 +61,6 @@ function AR.MakeGrid(win)
 	win.gridButtonList = {}
 	local cols = 4
 	local rows = math.floor((#AR.zones+cols) / cols)
-	d("AR.zones count = " .. #AR.zones)
 
 	win.gridBackdrop = wm:CreateControl(nil, win, CT_BACKDROP) --BackdropControl#BackdropControl
 	win.gridBackdrop:SetAnchor(TOPLEFT, win.backdrop, BOTTOMLEFT, 0, 0)
