@@ -25,6 +25,7 @@ function AR.MakeMenu()
     return AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
   end
 
+  -- LibAddonMenu2 wiki: https://github.com/sirinsidiator/ESO-LibAddonMenu/wiki/Controls
   local optionsTable = {
     {
       type = "header",
@@ -178,6 +179,22 @@ function AR.MakeMenu()
       default = AR.defaults.skipZoneOnCD,
     },
     {
+      type = "dropdown",
+      name = "Destination Priority",
+      tooltip = "When there is both a player and a house in the target zone, which to pick first?",
+      choices = { "Players first", "Houses first" },
+      choicesValues = { false, true },
+      getFunc = function()
+        return AR.settings.prioritisePortToHouse
+      end,
+      setFunc = function(value)
+        AR.settings.prioritisePortToHouse = value
+        AR.RefreshWindow()
+      end,
+      width = "full",
+      default = AR.defaults.prioritisePortToHouse,
+    },
+    {
       type = "checkbox",
       name = "Multiple rounds",
       tooltip = "Teleport through all zones again after a certain time",
@@ -208,16 +225,16 @@ function AR.MakeMenu()
     },
     {
       type = "checkbox",
-      name = "Write zones on cooldown to chat",
-      tooltip = "Write messages to the Chat window when skipping a zone that's on cooldown",
+      name = "Write skipped zones to chat",
+      tooltip = "Write messages to the Chat window when skipping a zone",
       getFunc = function()
-        return AR.settings.logZoneOnCD
+        return AR.settings.logSkippedZones
       end,
       setFunc = function(value)
-        AR.settings.logZoneOnCD = value
+        AR.settings.logSkippedZones = value
       end,
       width = "full",
-      default = AR.defaults.logZoneOnCD,
+      default = AR.defaults.logSkippedZones,
     },
 
     {
