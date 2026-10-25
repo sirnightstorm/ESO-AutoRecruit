@@ -417,6 +417,129 @@ local function OnMailSendFailed(_, reason)
 	AR.sendingMail = false
 end
 
+local function jumpToFastTravelNode(nodeIndex, zoneName, zoneId)
+	local ownZone = GetUnitWorldPosition("player")
+
+	AR.status = 1 -- We're porting!
+	AR.portingTo = zoneName
+
+	ZO_Dialogs_ReleaseDialog("FAST_TRAVEL_CONFIRM")
+	ZO_Dialogs_ReleaseDialog("RECALL_CONFIRM")
+
+	zo_callLater(function()
+		d("Fast travelling to node "..nodeIndex)
+		FastTravelToNode(nodeIndex)
+		--		ZO_WorldMap_HideWorldMap()
+
+		--		local known, name, _, _, icon, glowIcon, typePOI, _, isLocked = GetFastTravelNodeInfo(n)
+		--		ZO_Alert(UI_ALERT_CATEGORY_ALERT, SOUNDS.POSITIVE_CLICK,
+		--				zo_strformat(GetString(NAVIGATOR_TRAVELING_TO_LOCATION), name))
+	end, 10)
+
+	em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function() AR.afterPort(zoneId) end)
+	zo_callLater(function()
+		if ownZone==GetUnitWorldPosition("player") then
+			if AR.failed<3 then
+				AR.failed = AR.failed + 1
+				AR.portFailed(zoneId)
+			else
+				d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zoneName))
+				AR.stop()
+			end
+		end
+	end, 5000)
+	AR.RefreshWindow()
+end
+
+local function onStartFastTravel(eventCode, nodeIndex)
+	if AR.status == 0 then
+		d(string.format("|c6C00FFAuto Recruit - |cFFFFFF OnStartFastTravel(%d,%d) - disabled", eventCode, nodeIndex))
+		return
+	end
+
+	d(string.format("|c6C00FFAuto Recruit - |cFFFFFF OnStartFastTravel(%d,%d) status %d", eventCode, nodeIndex, AR.status))
+
+	local guildIndex = AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
+	local totalNodes = GetNumFastTravelNodes()
+
+	for i = 1, #AR.zones do
+		--		local btn = CreateControlFromVirtual("AWBtn" .. i, win, "ZO_DefaultButton")
+		local zoneName = GetZoneNameById(AR.zones[i])
+
+		local cooldown = 0
+		if AR.lastPosted[zoneName] then
+			cooldown = math.ceil((AR.settings.adCooldown[guildIndex]*60-(GetTimeStamp()-AR.lastPosted[zoneName]))/60)
+		end
+
+		if cooldown < 10 then
+			d(" - zone '"..zoneName.."': cooldown "..cooldown)
+
+			-- Look for a node to jump to
+			for n = 1, totalNodes do
+				local known, name, _, _, icon, glowIcon, typePOI, _, isLocked = GetFastTravelNodeInfo(n)
+				local nodeZoneIndex, _ = GetFastTravelNodePOIIndicies(n)
+				local nodeZoneId = GetZoneId(nodeZoneIndex)
+
+				if nodeZoneId == AR.zones[i] and typePOI == 1 then -- Wayshrine
+					jumpToFastTravelNode(n, zoneName, nodeZoneId)
+					return
+				end
+			end
+		end
+	end
+end
+
+local function onStartFastTravel_OLD(eventCode, nodeIndex)
+	if AR.status == 0 then
+		d(string.format("|c6C00FFAuto Recruit - |cFFFFFF OnStartFastTravel(%d,%d) - disabled", eventCode, nodeIndex))
+		return
+	end
+
+	d(string.format("|c6C00FFAuto Recruit - |cFFFFFF OnStartFastTravel(%d,%d) status %d", eventCode, nodeIndex, AR.status))
+
+	local guildIndex = AR.getGuildIndex(AR.getIDfromName(AR.settings.recruitFor))
+	local totalNodes = GetNumFastTravelNodes()
+
+	for n = 1, totalNodes do
+		local zoneIndex, poiIndex = GetFastTravelNodePOIIndicies(n)
+		local zoneId = GetZoneId(zoneIndex)
+		local zoneName = GetZoneNameById(zoneId)
+
+		--local cooldown = AR.settings.adCooldown[guildIndex] * 60 - (GetTimeStamp() - AR.lastPosted[zoneName])
+		local cooldown = 0
+
+		if AR.lastPosted[zoneName] then
+			cooldown = math.ceil((AR.settings.adCooldown[guildIndex]*60-(GetTimeStamp()-AR.lastPosted[zoneName]))/60)
+		end
+
+		if cooldown < 10 then
+			d(" - zone '"..zoneName.."': cooldown "..cooldown)
+
+			local ownZone = GetUnitWorldPosition("player")
+
+			AR.portingTo = zoneName
+
+			--zo_callLater(function() JumpToGuildMember(userID) end, 100)
+			jumpToFastTravelNode(n)
+
+			em:RegisterForEvent("AutoPortArrived", EVENT_PLAYER_ACTIVATED, function() AR.afterPort(zoneId) end)
+			zo_callLater(function()
+				if ownZone==GetUnitWorldPosition("player") then
+					if AR.failed<3 then
+						AR.failed = AR.failed + 1
+						AR.portFailed(zoneId)
+					else
+						d(zo_strformat("|c6C00FFAuto Port - |cFFFFFFPorting to <<1>> failed. Try again later.", zoneName))
+						AR.stop()
+					end
+				end
+			end, 10000)
+			AR.RefreshWindow()
+
+			return
+		end
+	end
+end
 
 function AR.Initialize(_, addon)
 	if addon ~= AR.name then return end
@@ -450,6 +573,7 @@ function AR.Initialize(_, addon)
 	em:RegisterForEvent(AR.name, EVENT_MAIL_CLOSE_MAILBOX, OnMailCloseMailBox)
 	em:RegisterForEvent(AR.name, EVENT_MAIL_SEND_SUCCESS, OnMailSendSuccess)
 	em:RegisterForEvent(AR.name, EVENT_MAIL_SEND_FAILED, OnMailSendFailed)
+	em:RegisterForEvent(AR.name, EVENT_START_FAST_TRAVEL_INTERACTION, onStartFastTravel)
 
 	LibCustomMenu:RegisterPlayerContextMenu(AR.context)
 
