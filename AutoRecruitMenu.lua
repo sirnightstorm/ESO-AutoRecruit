@@ -101,6 +101,22 @@ function AR.MakeMenu()
       default = AR.defaults.showPending,
     },
 
+    {
+      type = "dropdown",
+      name = "Zones Grid",
+      tooltip = "A grid of zones: green = posted & on cooldown, grey = inaccessible)",
+      choices = { "Hidden", "Automatic", "Always show" },
+      getFunc = function()
+        return AR.settings.showZonesGrid
+      end,
+      setFunc = function(value)
+        AR.settings.showZonesGrid = value
+        AR.RefreshWindow()
+      end,
+      width = "full",
+      default = AR.defaults.showZonesGrid,
+    },
+
 
     {
       type = "header",
@@ -151,7 +167,7 @@ function AR.MakeMenu()
     {
       type = "checkbox",
       name = "Skip zones on cooldown",
-      tooltip = "Don't port to zones, which you've recently posted an ad to",
+      tooltip = "Don't port to zones which you've recently posted an ad to",
       getFunc = function()
         return AR.settings.skipZoneOnCD
       end,
@@ -178,7 +194,7 @@ function AR.MakeMenu()
       type = "slider",
       name = "Multiple rounds cooldown",
       tooltip = "How long to wait after every round",
-      min = 5,
+      min = 1,
       max = 60,
       step = 1,
       getFunc = function()
@@ -189,6 +205,19 @@ function AR.MakeMenu()
       end,
       width = "full",
       default = AR.defaults.portingTime,
+    },
+    {
+      type = "checkbox",
+      name = "Write zones on cooldown to chat",
+      tooltip = "Write messages to the Chat window when skipping a zone that's on cooldown",
+      getFunc = function()
+        return AR.settings.logZoneOnCD
+      end,
+      setFunc = function(value)
+        AR.settings.logZoneOnCD = value
+      end,
+      width = "full",
+      default = AR.defaults.logZoneOnCD,
     },
 
     {

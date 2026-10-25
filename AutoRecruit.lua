@@ -38,8 +38,10 @@ AR.defaults = {
     keepPorting = false,
     portingTime = 15,
     skipZoneOnCD = true,
+		logZoneOnCD = true,
     includedZones = "Major",
     saveLastPosted = false,
+		showZonesGrid = "Hidden",
 
     guild1 = false,
     ad = {"", "", "", "", ""},
@@ -584,13 +586,15 @@ function AR.start()
 
  	if AR.lastPosted[nextZoneName] and AR.settings.skipZoneOnCD then
  		local cooldown = AR.settings.adCooldown[guild]*60-(GetTimeStamp()-AR.lastPosted[nextZoneName])
- 		
- 		if cooldown>10 then
- 			d(zo_strformat("|c6C00FFAuto Port - |cFFFFFF<<1>> is still on cooldown. Skipping this zone...", nextZoneName))
-  		AR.nextZone = AR.nextZone + 1
-  		AR.start()
- 		  return
- 		end
+
+		if cooldown>10 then
+			if AR.settings.logZoneOnCD then
+				d(zo_strformat("|c6C00FFAuto Port - |cFFFFFF<<1>> is still on cooldown. Skipping this zone...", nextZoneName))
+			end
+			AR.nextZone = AR.nextZone + 1
+			AR.start()
+			return
+		end
  	end
 
 
